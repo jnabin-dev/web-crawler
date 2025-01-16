@@ -1,6 +1,9 @@
 ﻿using System;
+using System.CodeDom.Compiler;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using ClosedXML.Excel;
@@ -125,7 +128,7 @@ namespace WindowsFormsApp2
         {
             try
             {
-                var results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string Address)>();
+                var results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address)>();
 
                 new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
                 ChromeOptions options = new ChromeOptions();
@@ -150,23 +153,112 @@ namespace WindowsFormsApp2
 
                     Thread.Sleep(5000); // Wait for search results to load
 
-                    ScrollToLoadMoreResults(driver);
-
-                    // Extract search results
-                    var resultElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-                    foreach (var resultElement in resultElements)
+                    var mapContainer = driver.FindElement(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
+                    var processedResults = new HashSet<string>();
+                    bool hasMoreResults = true;
+                    IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
+                    int lastHeight = 0;
+                    while (hasMoreResults)
                     {
-                        try
+                        // Extract search results
+                        var resultElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
+                        int i = 0;
+                        foreach (var resultElement in resultElements)
                         {
-                            string title = resultElement.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
-                            string address = resultElement.FindElement(By.ClassName("W4Efsd")).Text;
-                            results.Add((term, title, address));
+                            try
+                            {
+                                string reviewCount = string.Empty;
+                                string rating = string.Empty;
+                                string title = resultElement.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
+                                if (processedResults.Contains(title))
+                                {
+                                    i++;
+                                    continue; // Skip already processed results
+                                }
+                                    
+                                processedResults.Add(title);
+                                var clickableElement = driver.FindElements(By.CssSelector("a.hfpxzc"));
+                               // ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
+                                int height = clickableElement[i].Size.Height;
+                                //((IJavaScriptExecutor)driver).ExecuteScript($"arguments[0].scrollTop(0, {height});", mapContainer);
+                                //((IJavaScriptExecutor)driver).ExecuteScript($"arguments[0].scrollTop = {height}", mapContainer);
+                                //((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
+                                
+                                lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                                jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
+                                clickableElement[i].Click();
+                                i++;
+                                Thread.Sleep(3000);
+                                var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
+                                if (reviewListText != null && reviewListText.Count > 1)
+                                {
+                                    reviewCount = reviewListText[0];
+                                    rating = reviewListText[1];
+                                }
+                                string category = string.Empty;
+                                string location = string.Empty;
+                                var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
+                                if (elements != null)
+                                {
+                                    category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
+                                    location = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                    if (elements != null && category.Length > 0)
+                                    {
+                                        category = category.Split('.')[0];
+                                    }
+                                }
+                                string contactNumber = string.Empty;
+                                try
+                                {
+                                    contactNumber = resultElement.FindElement(By.ClassName("UsdlK")).Text;
+                                }
+                                catch (Exception ex)
+                                {
+                                }
+
+                                results.Add((term, title, reviewCount, rating, contactNumber, category, location));
+                                //driver.Navigate().Back();
+                                Thread.Sleep(2000);
+                            }
+                            catch (Exception ex)
+                            {
+                                // Skip if any element is missing
+                            }
                         }
-                        catch(Exception ex) 
+
+                        //double lastHeight = Convert.ToDouble(((IJavaScriptExecutor)driver).ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                        int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                        var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
+                        var t = newElements.Select(x =>
                         {
-                            // Skip if any element is missing
+                            string txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
+                            if (!processedResults.Contains(txt))
+                            {
+                                return txt;
+                            } else
+                            {
+                                return string.Empty;
+                            }
+                            
+                        }).ToList();
+                        t = t.Where(x => x.Length > 0).ToList();
+                        if (t.Count == 0)
+                        {
+                            hasMoreResults = false;
                         }
+                        //// Scroll further down
+                        //((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollBy(0, 500);", mapContainer);
+                        //Thread.Sleep(3000);
+                        //// Check if more results are loaded (adjust this condition as per your application's behavior)
+                        //bool isEndOfResults = !mapContainer.FindElements(By.XPath(".//div[@class='bfdHYd Ppzolf OFBs3e  ']")).Any();
+                        //if (isEndOfResults)
+                        //{
+                        //    hasMoreResults = false;
+                        //}
+                        ////hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer);
                     }
+
+                    
                 }
 
                 driver.Quit();
@@ -183,62 +275,98 @@ namespace WindowsFormsApp2
             }
         }
 
-        private void ScrollToLoadMoreResults(IWebDriver driver)
+        private List<string> GetRatingReview(string input)
+        {
+            List<string>  ratings = new List<string>();
+            string pattern = @"(\d+(\.\d+)?)(\((\d+)\))?";
+
+            // Apply regex match
+            Match match = Regex.Match(input, pattern);
+
+            if (match.Success)
+            {
+                string numberBeforeParentheses = match.Groups[1].Value; // The part before the parentheses (e.g., ৫.০)
+                string numberInsideParentheses = match.Groups[4].Value; // The number inside the parentheses (e.g., ৯)
+                ratings.Add(numberBeforeParentheses);
+                ratings.Add(numberInsideParentheses);
+                // If there's no number inside parentheses, we can set it to an empty string or handle it accordingly
+                if (string.IsNullOrEmpty(numberInsideParentheses))
+                {
+                    ratings.Add("No reviews"); // You can define your own default value here
+                }
+            }
+            else
+            {
+                ratings.Add("No reviews");
+            }
+
+            return ratings;
+        }
+
+        private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer)
         {
             // Execute JavaScript to scroll the results container down (not just the window)
             IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
 
             // Get the map container (or search results container)
-            var mapContainer = driver.FindElement(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
 
             // Get the initial scroll height
             int lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-            Console.WriteLine($"Initial Height: {lastHeight}");
+            // Scroll down the results container
+            jsExecutor.ExecuteScript("arguments[0].scrollTop = arguments[0].scrollHeight", mapContainer);
+            Thread.Sleep(3000);
+            int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+            return newHeight > lastHeight;
+            //bool reachedEnd = false;
 
-            bool reachedEnd = false;
+            //while (!reachedEnd)
+            //{
 
-            while (!reachedEnd)
-            {
-                // Scroll down the results container
-                jsExecutor.ExecuteScript("arguments[0].scrollTop = arguments[0].scrollHeight", mapContainer);
+            //    // Wait for new results to load
+            //    Thread.Sleep(3000); // Adjust this time as necessary
 
-                // Wait for new results to load
-                Thread.Sleep(3000); // Adjust this time as necessary
+            //    // Get the new scroll height
+            //    int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+            //    Console.WriteLine($"New Height after Scroll: {newHeight}");
 
-                // Get the new scroll height
-                int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                Console.WriteLine($"New Height after Scroll: {newHeight}");
-
-                // If the height hasn't changed, we've reached the end of the results
-                if (newHeight == lastHeight)
-                {
-                    reachedEnd = true; // No more results loaded
-                    Console.WriteLine("Reached the end of the results.");
-                }
-                else
-                {
-                    // Otherwise, update the height and continue scrolling
-                    lastHeight = newHeight;
-                }
-            }
+            //    // If the height hasn't changed, we've reached the end of the results
+            //    if (newHeight == lastHeight)
+            //    {
+            //        reachedEnd = true; // No more results loaded
+            //        Console.WriteLine("Reached the end of the results.");
+            //    }
+            //    else
+            //    {
+            //        // Otherwise, update the height and continue scrolling
+            //        lastHeight = newHeight;
+            //    }
+            //}
         }
 
-        private void ExportToExcel(System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string Address)> results)
+        private void ExportToExcel(System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address)> results)
         {
             try
             {
                 using (var workbook = new XLWorkbook())
                 {
                     var worksheet = workbook.Worksheets.Add("Results");
-                    worksheet.Cell(1, 1).Value = "Search Term";
+                    worksheet.Cell(1, 1).Value = "Keyword";
                     worksheet.Cell(1, 2).Value = "Result Title";
-                    worksheet.Cell(1, 3).Value = "Review";
+                    worksheet.Cell(1, 3).Value = "Category";
+                    worksheet.Cell(1, 4).Value = "Location";
+                    worksheet.Cell(1, 5).Value = "Contact Number";
+                    worksheet.Cell(1, 6).Value = "Rating";
+                    worksheet.Cell(1, 7).Value = "Review Count";
 
                     for (int i = 0; i < results.Count; i++)
                     {
                         worksheet.Cell(i + 2, 1).Value = results[i].SearchTerm;
                         worksheet.Cell(i + 2, 2).Value = results[i].ResultTitle;
-                        worksheet.Cell(i + 2, 3).Value = results[i].Address;
+                        worksheet.Cell(i + 2, 3).Value = results[i].Category;
+                        worksheet.Cell(i + 2, 4).Value = results[i].Address;
+                        worksheet.Cell(i + 2, 5).Value = results[i].ContactNumber;
+                        worksheet.Cell(i + 2, 6).Value = results[i].ReviewCount;
+                        worksheet.Cell(i + 2, 7).Value = results[i].Rating;
                     }
 
                     string filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GoogleMapsResults.xlsx");
