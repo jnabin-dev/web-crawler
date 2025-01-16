@@ -6,6 +6,8 @@ using System.Windows.Forms;
 using ClosedXML.Excel;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using WebDriverManager;
+using WebDriverManager.DriverConfigs.Impl;
 using Keys = OpenQA.Selenium.Keys;
 
 namespace WindowsFormsApp2
@@ -124,9 +126,16 @@ namespace WindowsFormsApp2
             try
             {
                 var results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string Address)>();
+
+                new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
                 ChromeOptions options = new ChromeOptions();
-                options.AddArgument("C:\\Users\\Skytech\\Downloads\\chrome-win64\\chrome-win64");
                 IWebDriver driver = new ChromeDriver(options);
+
+                //ChromeOptions options = new ChromeOptions();
+                //string driverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
+                //IWebDriver driver = new ChromeDriver(driverPath);
+                //options.AddArgument("C:\\Users\\Skytech\\Downloads\\chrome-win64\\chrome-win64");
+                //IWebDriver driver = new ChromeDriver(options);
 
                 driver.Navigate().GoToUrl("https://www.google.com/maps");
 
@@ -223,7 +232,7 @@ namespace WindowsFormsApp2
                     var worksheet = workbook.Worksheets.Add("Results");
                     worksheet.Cell(1, 1).Value = "Search Term";
                     worksheet.Cell(1, 2).Value = "Result Title";
-                    worksheet.Cell(1, 3).Value = "Address";
+                    worksheet.Cell(1, 3).Value = "Review";
 
                     for (int i = 0; i < results.Count; i++)
                     {
