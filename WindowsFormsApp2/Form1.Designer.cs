@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using ClosedXML.Excel;
+using DocumentFormat.OpenXml.Spreadsheet;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using WebDriverManager;
@@ -25,6 +26,8 @@ namespace WindowsFormsApp2
         private System.Windows.Forms.Button btnUpload;
         private System.Windows.Forms.Button btnStart;
         private System.Windows.Forms.Button stopCrawlButton;
+        private System.Windows.Forms.Button exportButton;
+        private System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, Dictionary<string, string>, string companyWebsite)> results;
         private DataGridView dataGridView;
         private CancellationTokenSource cancellationTokenSource;
         //private System.Windows.Forms.DataGridView dataGridView = new System.Windows.Forms.DataGridView();
@@ -55,11 +58,12 @@ namespace WindowsFormsApp2
         /// </summary>
         private void InitializeComponent()
         {
-            this.ClientSize = new System.Drawing.Size(800, 600);
+            this.ClientSize = new System.Drawing.Size(1100, 600);
             this.lblStatus = new System.Windows.Forms.Label();
             this.btnUpload = new System.Windows.Forms.Button();
             this.btnStart = new System.Windows.Forms.Button();
             this.stopCrawlButton = new System.Windows.Forms.Button();
+            this.exportButton = new System.Windows.Forms.Button();
             //((System.ComponentModel.ISupportInitialize)(this.dataGridView)).BeginInit();
             this.SuspendLayout();
 
@@ -100,28 +104,39 @@ namespace WindowsFormsApp2
             this.stopCrawlButton.Text = "Stop Crawl";
             this.stopCrawlButton.UseVisualStyleBackColor = true;
             this.stopCrawlButton.Click += new System.EventHandler(this.stopCrawlButton_Click);
+            
+            this.exportButton.Location = new System.Drawing.Point(500, 20); // Adjust position
+            this.exportButton.Name = "exportDataButton";
+            this.exportButton.Size = new System.Drawing.Size(100, 40); // Adjust size
+            this.exportButton.Text = "Export";
+            this.exportButton.UseVisualStyleBackColor = true;
+            this.exportButton.Click += new System.EventHandler(this.exportDataButton_Click);
 
             this.dataGridView = new System.Windows.Forms.DataGridView();
-            this.dataGridView.Location = new System.Drawing.Point(50, 120);
-            this.dataGridView.Size = new System.Drawing.Size(700, 400);
-            this.dataGridView.ColumnCount = 15;
+            this.dataGridView.Location = new System.Drawing.Point(20, 100);
+            this.dataGridView.Size = new System.Drawing.Size(1000, 400);
+            this.dataGridView.ColumnCount = 19;
             this.dataGridView.ReadOnly = true;
             this.dataGridView.AllowUserToAddRows = false;
-            this.dataGridView.Columns[0].Name = "Keyword";
-            this.dataGridView.Columns[1].Name = "Result Title";
-            this.dataGridView.Columns[2].Name = "Category";
-            this.dataGridView.Columns[3].Name = "Location";
-            this.dataGridView.Columns[4].Name = "Contact Number";
-            this.dataGridView.Columns[5].Name = "Email";
-            this.dataGridView.Columns[6].Name = "Website";
-            this.dataGridView.Columns[7].Name = "Facebook";
-            this.dataGridView.Columns[8].Name = "Linkedin";
-            this.dataGridView.Columns[9].Name = "Twitter";
-            this.dataGridView.Columns[10].Name = "Youtube";
-            this.dataGridView.Columns[11].Name = "Instagram";
-            this.dataGridView.Columns[12].Name = "Pinterest";
-            this.dataGridView.Columns[13].Name = "Ratiung";
-            this.dataGridView.Columns[14].Name = "Review Count";
+            this.dataGridView.Columns[0].Name = "#";
+            this.dataGridView.Columns[1].Name = "Keyword";
+            this.dataGridView.Columns[2].Name = "Name";
+            this.dataGridView.Columns[3].Name = "Category";
+            this.dataGridView.Columns[4].Name = "Full_Address";
+            this.dataGridView.Columns[5].Name = "Street_Address";
+            this.dataGridView.Columns[6].Name = "City";
+            this.dataGridView.Columns[7].Name = "Zip";
+            this.dataGridView.Columns[8].Name = "Contact Number";
+            this.dataGridView.Columns[9].Name = "Email";
+            this.dataGridView.Columns[10].Name = "Website";
+            this.dataGridView.Columns[11].Name = "Facebook";
+            this.dataGridView.Columns[12].Name = "Linkedin";
+            this.dataGridView.Columns[13].Name = "Twitter";
+            this.dataGridView.Columns[14].Name = "Youtube";
+            this.dataGridView.Columns[15].Name = "Instagram";
+            this.dataGridView.Columns[16].Name = "Pinterest";
+            this.dataGridView.Columns[17].Name = "Ratiung";
+            this.dataGridView.Columns[18].Name = "Review Count";
             // 
             // Form1
             // 
@@ -133,9 +148,10 @@ namespace WindowsFormsApp2
             this.Controls.Add(this.btnUpload);
             this.Controls.Add(this.btnStart);
             this.Controls.Add(this.stopCrawlButton);
+            this.Controls.Add(this.exportButton);
             this.Controls.Add(this.dataGridView);
             this.Name = "MainForm";
-            this.Text = "Google Maps Crawler";
+            this.Text = "Codezzi Crawler";
             //((System.ComponentModel.ISupportInitialize)(this.dataGridView)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -151,6 +167,11 @@ namespace WindowsFormsApp2
                 cancellationTokenSource.Cancel();
                 lblStatus.Text = "Stopping crawl...";
             }
+        }
+        
+        private void exportDataButton_Click(object sender, EventArgs e)
+        {
+            ExportToExcel(results);
         }
 
         private void btnUpload_Click(object sender, EventArgs e)
@@ -189,6 +210,7 @@ namespace WindowsFormsApp2
             }
             cancellationTokenSource = new CancellationTokenSource();
             dataGridView.Rows.Clear();
+            results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, Dictionary<string, string>, string companyWebsite)>();
             new Thread(async () => await StartCrawlingAsync(cancellationTokenSource.Token)).Start();
         }
 
@@ -197,8 +219,6 @@ namespace WindowsFormsApp2
         {
             try
             {
-                var results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, Dictionary<string, string>, string companyWebsite)>();
-
                 new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
                 ChromeOptions options = new ChromeOptions();
                 IWebDriver driver = new ChromeDriver(options);
@@ -235,6 +255,7 @@ namespace WindowsFormsApp2
                             break;
                         }
                         // Extract search results
+                        
                         var resultElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
                         int i = 0;
                         ChromeDriverService service = ChromeDriverService.CreateDefaultService();
@@ -265,9 +286,6 @@ namespace WindowsFormsApp2
                                 var clickableElement = driver.FindElements(By.CssSelector("a.hfpxzc"));
                                // ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
                                 int height = clickableElement[i].Size.Height;
-                                //((IJavaScriptExecutor)driver).ExecuteScript($"arguments[0].scrollTop(0, {height});", mapContainer);
-                                //((IJavaScriptExecutor)driver).ExecuteScript($"arguments[0].scrollTop = {height}", mapContainer);
-                                //((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
                                 
                                 lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                                 jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
@@ -275,7 +293,7 @@ namespace WindowsFormsApp2
                                 i++;
                                 if (linkElement.Count > 0)
                                 {
-                                    hrefValue = linkElement[0].GetAttribute("href");
+                                    hrefValue = linkElement[0].GetDomAttribute("href");
                                     var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
                                     keyValuePairs = await task;
                                 }
@@ -286,15 +304,33 @@ namespace WindowsFormsApp2
                                     rating = reviewListText[1];
                                 }
                                 string category = string.Empty;
-                                string location = string.Empty;
+                                string city = string.Empty;
+                                string zip = string.Empty;
+                                string streetLocation = string.Empty;
+                                var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
+                                string location = detailsElems[0].FindElement(By.CssSelector(".Io6YTe.fontBodyMedium.kR99db.fdkmkc")).Text;
+                                string pattern = @"^(?<Street>.*?),\s*(?<City>[\p{IsBengali}\w\s]+?)\s+(?<Zip>\d+)$";
+                                var regex = new Regex(pattern);
+                                var match = regex.Match(location);
                                 var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
+                                if (match.Success)
+                                {
+                                    streetLocation = match.Groups["Street"].Value;
+                                    city = match.Groups["City"].Value;
+                                    zip = match.Groups["Zip"].Value;
+                                }
+                                else
+                                {
+                                    streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                }
+                                //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
+                                //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
                                 if (elements != null)
                                 {
                                     category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
-                                    location = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
                                     if (elements != null && category.Length > 0)
                                     {
-                                        category = category.Split('.')[0];
+                                        category = category.Split('·')[0];
                                     }
                                 }
                                 string contactNumber = string.Empty;
@@ -306,11 +342,12 @@ namespace WindowsFormsApp2
                                 {
                                 }
 
-                                results.Add((term, title, reviewCount, rating, contactNumber, category, location, keyValuePairs, hrefValue));
+                                results.Add((term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, keyValuePairs, hrefValue));
                                 Invoke(new Action(() =>
                                 {
                                     dataGridView.Rows.Add(
-                                        term, title, category, location, contactNumber, 
+                                        dataGridView.Rows.Count + 1,
+                                        term, title, category, location, streetLocation.Replace("·", ""), city, zip, contactNumber, 
                                         keyValuePairs.ContainsKey("emails") ? keyValuePairs["emails"] : string.Empty, 
                                         hrefValue,
                                         keyValuePairs.ContainsKey("facebook") ? keyValuePairs["facebook"] : string.Empty, 
@@ -322,6 +359,7 @@ namespace WindowsFormsApp2
                                         rating, reviewCount);
 
                                 }));
+                                //driver.Navigate().Back();
                                 //driver.Navigate().Back();
                                 Thread.Sleep(2000);
                             }
@@ -365,9 +403,9 @@ namespace WindowsFormsApp2
                 driver.Quit();
 
                 // Export results to Excel
-                ExportToExcel(results);
+                //ExportToExcel(results);
 
-                Invoke(new Action(() => lblStatus.Text = "Crawling finished. Results exported."));
+                Invoke(new Action(() => lblStatus.Text = "Crawling finished."));
             }
             catch (Exception ex)
             {
@@ -445,7 +483,7 @@ namespace WindowsFormsApp2
                             bool isInvalidValid = 
                                 link == "https://www.linkedin.com/" || 
                                 link == "https://www.facebook.com/" || 
-                                link == "https://www.twitter.com/" || 
+                                link == "https://www.x.com/" || 
                                 link == "https://instagram.com/" || 
                                 link == "https://youtube.com/" || 
                                 link == "https://pinterest.com/";
@@ -475,7 +513,7 @@ namespace WindowsFormsApp2
                 }
                 else
                 {
-                    socialLinks["emails"] = "No emails found";
+                    socialLinks["emails"] = string.Empty;
                 }
             }
             catch (Exception ex)
@@ -590,7 +628,7 @@ namespace WindowsFormsApp2
             //}
         }
 
-        private void ExportToExcel(System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, Dictionary<string, string> socialMedias, string hrefValue)> results)
+        private void ExportToExcel(System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, Dictionary<string, string> socialMedias, string hrefValue)> results)
         {
             try
             {
@@ -598,20 +636,23 @@ namespace WindowsFormsApp2
                 {
                     var worksheet = workbook.Worksheets.Add("Results");
                     worksheet.Cell(1, 1).Value = "Keyword";
-                    worksheet.Cell(1, 2).Value = "Result Title";
+                    worksheet.Cell(1, 2).Value = "Name";
                     worksheet.Cell(1, 3).Value = "Category";
-                    worksheet.Cell(1, 4).Value = "Location";
-                    worksheet.Cell(1, 5).Value = "Contact Number";
-                    worksheet.Cell(1, 6).Value = "Email";
-                    worksheet.Cell(1, 7).Value = "Website";
-                    worksheet.Cell(1, 8).Value = "Facebook";
-                    worksheet.Cell(1, 9).Value = "LinkedIn";
-                    worksheet.Cell(1, 10).Value = "Twitter";
-                    worksheet.Cell(1, 11).Value = "Youtube";
-                    worksheet.Cell(1, 12).Value = "Instagram";
-                    worksheet.Cell(1, 13).Value = "Pinterest";
-                    worksheet.Cell(1, 14).Value = "Rating";
-                    worksheet.Cell(1, 15).Value = "Review Count";
+                    worksheet.Cell(1, 4).Value = "Full_Address";
+                    worksheet.Cell(1, 5).Value = "Street_Address";
+                    worksheet.Cell(1, 6).Value = "City";
+                    worksheet.Cell(1, 7).Value = "Zip";
+                    worksheet.Cell(1, 8).Value = "Contact Number";
+                    worksheet.Cell(1, 9).Value = "Email";
+                    worksheet.Cell(1, 10).Value = "Website";
+                    worksheet.Cell(1, 11).Value = "Facebook";
+                    worksheet.Cell(1, 12).Value = "LinkedIn";
+                    worksheet.Cell(1, 13).Value = "Twitter";
+                    worksheet.Cell(1, 14).Value = "Youtube";
+                    worksheet.Cell(1, 15).Value = "Instagram";
+                    worksheet.Cell(1, 16).Value = "Pinterest";
+                    worksheet.Cell(1, 17).Value = "Rating";
+                    worksheet.Cell(1, 18).Value = "Review Count";
 
                     for (int i = 0; i < results.Count; i++)
                     {
@@ -619,22 +660,31 @@ namespace WindowsFormsApp2
                         worksheet.Cell(i + 2, 2).Value = results[i].ResultTitle;
                         worksheet.Cell(i + 2, 3).Value = results[i].Category;
                         worksheet.Cell(i + 2, 4).Value = results[i].Address;
-                        worksheet.Cell(i + 2, 5).Value = results[i].ContactNumber;
-                        worksheet.Cell(i + 2, 6).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
-                        worksheet.Cell(i + 2, 7).Value = results[i].hrefValue;
-                        worksheet.Cell(i + 2, 8).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
-                        worksheet.Cell(i + 2, 9).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
-                        worksheet.Cell(i + 2, 10).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
-                        worksheet.Cell(i + 2, 11).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
-                        worksheet.Cell(i + 2, 12).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
-                        worksheet.Cell(i + 2, 13).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
-                        worksheet.Cell(i + 2, 14).Value = results[i].ReviewCount;
-                        worksheet.Cell(i + 2, 15).Value = results[i].Rating;
+                        worksheet.Cell(i + 2, 5).Value = results[i].streetAddress;
+                        worksheet.Cell(i + 2, 6).Value = results[i].city;
+                        worksheet.Cell(i + 2, 7).Value = results[i].zip;
+                        worksheet.Cell(i + 2, 8).Value = results[i].ContactNumber;
+                        worksheet.Cell(i + 2, 9).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
+                        worksheet.Cell(i + 2, 10).Value = results[i].hrefValue;
+                        worksheet.Cell(i + 2, 11).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
+                        worksheet.Cell(i + 2, 12).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
+                        worksheet.Cell(i + 2, 13).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
+                        worksheet.Cell(i + 2, 14).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
+                        worksheet.Cell(i + 2, 15).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
+                        worksheet.Cell(i + 2, 16).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
+                        worksheet.Cell(i + 2, 17).Value = results[i].ReviewCount;
+                        worksheet.Cell(i + 2, 18).Value = results[i].Rating;
                     }
-
-                    string filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GoogleMapsResults.xlsx");
-                    workbook.SaveAs(filePath);
-                    MessageBox.Show($"Results exported to {filePath}", "Export Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    SaveFileDialog saveFileDialog = new SaveFileDialog();
+                    // Set filter for Excel files
+                    saveFileDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*";
+                    saveFileDialog.DefaultExt = "xlsx";  // Default extension
+                    if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        string filePath = saveFileDialog.FileName;
+                        workbook.SaveAs(filePath);
+                        MessageBox.Show("File exported successfully!", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
                 }
             }
             catch (Exception ex)
