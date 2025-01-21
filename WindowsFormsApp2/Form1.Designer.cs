@@ -24,6 +24,9 @@ namespace WindowsFormsApp2
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.Button btnUpload;
         private System.Windows.Forms.Button btnStart;
+        private System.Windows.Forms.Button stopCrawlButton;
+        private DataGridView dataGridView;
+        private CancellationTokenSource cancellationTokenSource;
         //private System.Windows.Forms.DataGridView dataGridView = new System.Windows.Forms.DataGridView();
         //private DataTable resultsDataTable = new DataTable();
         /// <summary>
@@ -52,9 +55,11 @@ namespace WindowsFormsApp2
         /// </summary>
         private void InitializeComponent()
         {
+            this.ClientSize = new System.Drawing.Size(800, 600);
             this.lblStatus = new System.Windows.Forms.Label();
             this.btnUpload = new System.Windows.Forms.Button();
             this.btnStart = new System.Windows.Forms.Button();
+            this.stopCrawlButton = new System.Windows.Forms.Button();
             //((System.ComponentModel.ISupportInitialize)(this.dataGridView)).BeginInit();
             this.SuspendLayout();
 
@@ -88,16 +93,47 @@ namespace WindowsFormsApp2
             this.btnStart.Text = "Start Crawling";
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
+
+            this.stopCrawlButton.Location = new System.Drawing.Point(370, 20); // Adjust position
+            this.stopCrawlButton.Name = "stopCrawlButton";
+            this.stopCrawlButton.Size = new System.Drawing.Size(100, 40); // Adjust size
+            this.stopCrawlButton.Text = "Stop Crawl";
+            this.stopCrawlButton.UseVisualStyleBackColor = true;
+            this.stopCrawlButton.Click += new System.EventHandler(this.stopCrawlButton_Click);
+
+            this.dataGridView = new System.Windows.Forms.DataGridView();
+            this.dataGridView.Location = new System.Drawing.Point(50, 120);
+            this.dataGridView.Size = new System.Drawing.Size(700, 400);
+            this.dataGridView.ColumnCount = 15;
+            this.dataGridView.ReadOnly = true;
+            this.dataGridView.AllowUserToAddRows = false;
+            this.dataGridView.Columns[0].Name = "Keyword";
+            this.dataGridView.Columns[1].Name = "Result Title";
+            this.dataGridView.Columns[2].Name = "Category";
+            this.dataGridView.Columns[3].Name = "Location";
+            this.dataGridView.Columns[4].Name = "Contact Number";
+            this.dataGridView.Columns[5].Name = "Email";
+            this.dataGridView.Columns[6].Name = "Website";
+            this.dataGridView.Columns[7].Name = "Facebook";
+            this.dataGridView.Columns[8].Name = "Linkedin";
+            this.dataGridView.Columns[9].Name = "Twitter";
+            this.dataGridView.Columns[10].Name = "Youtube";
+            this.dataGridView.Columns[11].Name = "Instagram";
+            this.dataGridView.Columns[12].Name = "Pinterest";
+            this.dataGridView.Columns[13].Name = "Ratiung";
+            this.dataGridView.Columns[14].Name = "Review Count";
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(400, 200); // Adjust size as needed
+            //this.ClientSize = new System.Drawing.Size(400, 200); // Adjust size as needed
             //this.Controls.Add(this.dataGridView);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.btnUpload);
             this.Controls.Add(this.btnStart);
+            this.Controls.Add(this.stopCrawlButton);
+            this.Controls.Add(this.dataGridView);
             this.Name = "MainForm";
             this.Text = "Google Maps Crawler";
             //((System.ComponentModel.ISupportInitialize)(this.dataGridView)).EndInit();
@@ -108,29 +144,14 @@ namespace WindowsFormsApp2
 
         #endregion
 
-        //private void InitializeDataTable()
-        //{
-        //    // Define the DataTable with columns
-        //    resultsDataTable = new DataTable();
-        //    resultsDataTable.Columns.Add("Keyword");
-        //    resultsDataTable.Columns.Add("Result Title");
-        //    resultsDataTable.Columns.Add("Category");
-        //    resultsDataTable.Columns.Add("Location");
-        //    resultsDataTable.Columns.Add("Contact Number");
-        //    resultsDataTable.Columns.Add("Email");
-        //    resultsDataTable.Columns.Add("Website");
-        //    resultsDataTable.Columns.Add("Facebook");
-        //    resultsDataTable.Columns.Add("Linkedin");
-        //    resultsDataTable.Columns.Add("Twitter");
-        //    resultsDataTable.Columns.Add("Youtube");
-        //    resultsDataTable.Columns.Add("Instagram");
-        //    resultsDataTable.Columns.Add("Pinterest");
-        //    resultsDataTable.Columns.Add("Ratiung");
-        //    resultsDataTable.Columns.Add("Review Count");
-
-        //    // Bind the DataTable to the DataGridView
-        //    dataGridView.DataSource = resultsDataTable;
-        //}
+        private void stopCrawlButton_Click(object sender, EventArgs e)
+        {
+            if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
+            {
+                cancellationTokenSource.Cancel();
+                lblStatus.Text = "Stopping crawl...";
+            }
+        }
 
         private void btnUpload_Click(object sender, EventArgs e)
         {
@@ -162,11 +183,17 @@ namespace WindowsFormsApp2
 
             lblStatus.Text = "Crawling started...";
             //InitializeDataTable();
-            new Thread(async () => await StartCrawlingAsync()).Start();
+            if (cancellationTokenSource != null)
+            {
+                cancellationTokenSource.Dispose();
+            }
+            cancellationTokenSource = new CancellationTokenSource();
+            dataGridView.Rows.Clear();
+            new Thread(async () => await StartCrawlingAsync(cancellationTokenSource.Token)).Start();
         }
 
 
-        private async Task StartCrawlingAsync()
+        private async Task StartCrawlingAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -175,16 +202,17 @@ namespace WindowsFormsApp2
                 new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
                 ChromeOptions options = new ChromeOptions();
                 IWebDriver driver = new ChromeDriver(options);
-                //ChromeOptions options = new ChromeOptions();
-                //string driverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
-                //IWebDriver driver = new ChromeDriver(driverPath);
-                //options.AddArgument("C:\\Users\\Skytech\\Downloads\\chrome-win64\\chrome-win64");
-                //IWebDriver driver = new ChromeDriver(options);
+                driver.Manage().Window.Maximize();
 
-                driver.Navigate().GoToUrl("https://www.google.com/maps");
+                driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
 
                 foreach (string term in searchTerms)
                 {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        //lblStatus.Text = "Crawling stopped.";
+                        break;
+                    }
                     // Wait for the search box to load
                     Thread.Sleep(2000);
                     var searchBox = driver.FindElement(By.Id("searchboxinput"));
@@ -201,6 +229,11 @@ namespace WindowsFormsApp2
                     int lastHeight = 0;
                     while (hasMoreResults)
                     {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            hasMoreResults = false;
+                            break;
+                        }
                         // Extract search results
                         var resultElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
                         int i = 0;
@@ -208,6 +241,11 @@ namespace WindowsFormsApp2
                         service.HideCommandPromptWindow = true;
                         foreach (var resultElement in resultElements)
                         {
+                            if (cancellationToken.IsCancellationRequested)
+                            {
+                                hasMoreResults = false;
+                                break;
+                            }
                             try
                             {
                                 string reviewCount = string.Empty;
@@ -222,12 +260,7 @@ namespace WindowsFormsApp2
                                 Dictionary<string, string> keyValuePairs = new Dictionary<string, string>();
                                 var linkElement = resultElement.FindElements(By.ClassName("lcr4fd"));
                                 string hrefValue = string.Empty;
-                                if (linkElement.Count > 0)
-                                {
-                                    hrefValue = linkElement[0].GetAttribute("href");
-                                    var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
-                                    keyValuePairs = await task;
-                                }
+                                
                                 processedResults.Add(title);
                                 var clickableElement = driver.FindElements(By.CssSelector("a.hfpxzc"));
                                // ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
@@ -240,7 +273,12 @@ namespace WindowsFormsApp2
                                 jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
                                 clickableElement[i].Click();
                                 i++;
-                                Thread.Sleep(3000);
+                                if (linkElement.Count > 0)
+                                {
+                                    hrefValue = linkElement[0].GetAttribute("href");
+                                    var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
+                                    keyValuePairs = await task;
+                                }
                                 var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
                                 if (reviewListText != null && reviewListText.Count > 1)
                                 {
@@ -269,12 +307,22 @@ namespace WindowsFormsApp2
                                 }
 
                                 results.Add((term, title, reviewCount, rating, contactNumber, category, location, keyValuePairs, hrefValue));
-                                //Invoke(new Action(() =>
-                                //{
-                                //    // Add a new row with the extracted data
-                                //    resultsDataTable.Rows.Add(term, title, reviewCount, rating, contactNumber, category, location, "", "", "", "", "", "", hrefValue);
-                                //}));
-                                driver.Navigate().Back();
+                                Invoke(new Action(() =>
+                                {
+                                    dataGridView.Rows.Add(
+                                        term, title, category, location, contactNumber, 
+                                        keyValuePairs.ContainsKey("emails") ? keyValuePairs["emails"] : string.Empty, 
+                                        hrefValue,
+                                        keyValuePairs.ContainsKey("facebook") ? keyValuePairs["facebook"] : string.Empty, 
+                                        keyValuePairs.ContainsKey("linkedin") ? keyValuePairs["linkedin"] : string.Empty, 
+                                        keyValuePairs.ContainsKey("x") ? keyValuePairs["x"] : string.Empty, 
+                                        keyValuePairs.ContainsKey("youtube") ? keyValuePairs["youtube"] : string.Empty, 
+                                        keyValuePairs.ContainsKey("instagram") ? keyValuePairs["instagram"] : string.Empty, 
+                                        keyValuePairs.ContainsKey("pinterest") ? keyValuePairs["pinterest"] : string.Empty, 
+                                        rating, reviewCount);
+
+                                }));
+                                //driver.Navigate().Back();
                                 Thread.Sleep(2000);
                             }
                             catch (Exception ex)
@@ -303,16 +351,12 @@ namespace WindowsFormsApp2
                         {
                             hasMoreResults = false;
                         }
-                        //// Scroll further down
-                        //((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollBy(0, 500);", mapContainer);
-                        //Thread.Sleep(3000);
-                        //// Check if more results are loaded (adjust this condition as per your application's behavior)
-                        //bool isEndOfResults = !mapContainer.FindElements(By.XPath(".//div[@class='bfdHYd Ppzolf OFBs3e  ']")).Any();
-                        //if (isEndOfResults)
-                        //{
-                        //    hasMoreResults = false;
-                        //}
-                        ////hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            //lblStatus.Text = "Crawling stopped.";
+                            hasMoreResults = false;
+                            break;
+                        }
                     }
 
                     
@@ -331,19 +375,6 @@ namespace WindowsFormsApp2
                 Invoke(new Action(() => lblStatus.Text = "Error occurred."));
             }
         }
-
-    //    private string GetRandomUserAgent()
-    //    {
-    //        var userAgents = new List<string>
-    //{
-    //    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    //    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
-    //    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Firefox/89.0"
-    //};
-
-    //        Random rand = new Random();
-    //        return userAgents[rand.Next(userAgents.Count)];
-    //    }
 
         private List<string> GetRatingReview(string input)
         {
