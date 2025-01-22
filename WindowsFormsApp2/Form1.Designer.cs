@@ -27,7 +27,7 @@ namespace WindowsFormsApp2
         private System.Windows.Forms.Button btnStart;
         private System.Windows.Forms.Button stopCrawlButton;
         private System.Windows.Forms.Button exportButton;
-        private System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, Dictionary<string, string>, string companyWebsite)> results;
+        private System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)> results;
         private DataGridView dataGridView;
         private CancellationTokenSource cancellationTokenSource;
         //private System.Windows.Forms.DataGridView dataGridView = new System.Windows.Forms.DataGridView();
@@ -115,7 +115,7 @@ namespace WindowsFormsApp2
             this.dataGridView = new System.Windows.Forms.DataGridView();
             this.dataGridView.Location = new System.Drawing.Point(20, 100);
             this.dataGridView.Size = new System.Drawing.Size(1000, 400);
-            this.dataGridView.ColumnCount = 19;
+            this.dataGridView.ColumnCount = 20;
             this.dataGridView.ReadOnly = true;
             this.dataGridView.AllowUserToAddRows = false;
             this.dataGridView.Columns[0].Name = "#";
@@ -126,17 +126,18 @@ namespace WindowsFormsApp2
             this.dataGridView.Columns[5].Name = "Street_Address";
             this.dataGridView.Columns[6].Name = "City";
             this.dataGridView.Columns[7].Name = "Zip";
-            this.dataGridView.Columns[8].Name = "Contact Number";
-            this.dataGridView.Columns[9].Name = "Email";
-            this.dataGridView.Columns[10].Name = "Website";
-            this.dataGridView.Columns[11].Name = "Facebook";
-            this.dataGridView.Columns[12].Name = "Linkedin";
-            this.dataGridView.Columns[13].Name = "Twitter";
-            this.dataGridView.Columns[14].Name = "Youtube";
-            this.dataGridView.Columns[15].Name = "Instagram";
-            this.dataGridView.Columns[16].Name = "Pinterest";
-            this.dataGridView.Columns[17].Name = "Ratiung";
-            this.dataGridView.Columns[18].Name = "Review Count";
+            this.dataGridView.Columns[8].Name = "Country";
+            this.dataGridView.Columns[9].Name = "Contact Number";
+            this.dataGridView.Columns[10].Name = "Email";
+            this.dataGridView.Columns[11].Name = "Website";
+            this.dataGridView.Columns[12].Name = "Facebook";
+            this.dataGridView.Columns[13].Name = "Linkedin";
+            this.dataGridView.Columns[14].Name = "Twitter";
+            this.dataGridView.Columns[15].Name = "Youtube";
+            this.dataGridView.Columns[16].Name = "Instagram";
+            this.dataGridView.Columns[17].Name = "Pinterest";
+            this.dataGridView.Columns[18].Name = "Ratiung";
+            this.dataGridView.Columns[19].Name = "Review Count";
             // 
             // Form1
             // 
@@ -210,7 +211,7 @@ namespace WindowsFormsApp2
             }
             cancellationTokenSource = new CancellationTokenSource();
             dataGridView.Rows.Clear();
-            results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, Dictionary<string, string>, string companyWebsite)>();
+            results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)>();
             new Thread(async () => await StartCrawlingAsync(cancellationTokenSource.Token)).Start();
         }
 
@@ -240,7 +241,7 @@ namespace WindowsFormsApp2
                     searchBox.SendKeys(term);
                     searchBox.SendKeys(Keys.Enter);
 
-                    Thread.Sleep(5000); // Wait for search results to load
+                    Thread.Sleep(4000); // Wait for search results to load
 
                     var mapContainer = driver.FindElement(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
                     var processedResults = new HashSet<string>();
@@ -297,6 +298,7 @@ namespace WindowsFormsApp2
                                     var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
                                     keyValuePairs = await task;
                                 }
+                                //Thread.Sleep(500);
                                 var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
                                 if (reviewListText != null && reviewListText.Count > 1)
                                 {
@@ -306,18 +308,20 @@ namespace WindowsFormsApp2
                                 string category = string.Empty;
                                 string city = string.Empty;
                                 string zip = string.Empty;
+                                string country = string.Empty;
                                 string streetLocation = string.Empty;
                                 var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
                                 string location = detailsElems[0].FindElement(By.CssSelector(".Io6YTe.fontBodyMedium.kR99db.fdkmkc")).Text;
-                                string pattern = @"^(?<Street>.*?),\s*(?<City>[\p{IsBengali}\w\s]+?)\s+(?<Zip>\d+)$";
+                                string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
                                 var regex = new Regex(pattern);
                                 var match = regex.Match(location);
                                 var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
                                 if (match.Success)
                                 {
-                                    streetLocation = match.Groups["Street"].Value;
-                                    city = match.Groups["City"].Value;
-                                    zip = match.Groups["Zip"].Value;
+                                    streetLocation = match.Groups["street"].Value;
+                                    city = match.Groups["city"].Value;
+                                    zip = match.Groups["zip"].Value;
+                                    country = match.Groups["country"].Value;
                                 }
                                 else
                                 {
@@ -342,12 +346,12 @@ namespace WindowsFormsApp2
                                 {
                                 }
 
-                                results.Add((term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, keyValuePairs, hrefValue));
+                                results.Add((term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue));
                                 Invoke(new Action(() =>
                                 {
                                     dataGridView.Rows.Add(
                                         dataGridView.Rows.Count + 1,
-                                        term, title, category, location, streetLocation.Replace("·", ""), city, zip, contactNumber, 
+                                        term, title, category, location, streetLocation.Replace("·", ""), city, zip, country, contactNumber, 
                                         keyValuePairs.ContainsKey("emails") ? keyValuePairs["emails"] : string.Empty, 
                                         hrefValue,
                                         keyValuePairs.ContainsKey("facebook") ? keyValuePairs["facebook"] : string.Empty, 
@@ -361,14 +365,14 @@ namespace WindowsFormsApp2
                                 }));
                                 //driver.Navigate().Back();
                                 //driver.Navigate().Back();
-                                Thread.Sleep(2000);
+                                
                             }
                             catch (Exception ex)
                             {
                                 // Skip if any element is missing
                             }
                         }
-
+                        Thread.Sleep(3000);
                         //double lastHeight = Convert.ToDouble(((IJavaScriptExecutor)driver).ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                         int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                         var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
@@ -448,14 +452,42 @@ namespace WindowsFormsApp2
             if (businessUrl == null || businessUrl.Length == 0) {  return socialLinks; }
             // Launch a new browser (this could be in a separate ChromeDriver instance)
             var options = new ChromeOptions();
-            options.AddArguments("headless", "disable-gpu", "no-sandbox");
-            options.AddArguments("--blink-settings=imagesEnabled=false");  // Disable images
-            options.AddArguments("--disable-css");  // Disable CSS
-            options.AddArguments("--disable-javascript");  // Disable JavaScript
-            
+            options.PageLoadStrategy = PageLoadStrategy.Eager;
+            options.AddArgument("--headless");                // Run in headless mode
+            options.AddArgument("--disable-gpu");             // For better performance
+            options.AddArgument("--disable-extensions");      // Disable unnecessary extensions
+            options.AddArgument("--no-sandbox");              // Disable sandbox mode
+            options.AddArgument("--log-level=3");
+            options.AddArgument("--disable-popup-blocking");
+            options.AddArgument("--enable-features=NetworkService,NetworkServiceInProcess");
+            options.AddArgument("--enable-async-dns");
+            options.AddArgument("--reduce-security-for-testing");
+            //options.AddLocalStatePreference("profile.managed_default_content_settings.images", 2);
+            //options.AddLocalStatePreference("profile.managed_default_content_settings.stylesheet", 2);
+            //options.AddLocalStatePreference("profile.managed_default_content_settings.fonts", 2);
+            //options.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
+            //options.AddUserProfilePreference("profile.default_content_setting_values.fonts", 2);
+            //options.AddUserProfilePreference("profile.default_content_setting_values.css", 2);
+            // Block unnecessary resources
+            //var prefs = new Dictionary<string, object>
+            //{
+            //    ["profile.managed_default_content_settings.images"] = 2, // Block images
+            //    ["profile.managed_default_content_settings.css"] = 2,    // Block CSS
+            //    ["profile.managed_default_content_settings.fonts"] = 2   // Block fonts
+            //};
+            //options.AddAdditionalOption("prefs", prefs);
+
+            options.AddUserProfilePreference("profile.managed_default_content_settings.images", 2); // Block images
+            options.AddUserProfilePreference("profile.managed_default_content_settings.css", 2);    // Block CSS
+            options.AddUserProfilePreference("profile.managed_default_content_settings.fonts", 2);  // Block fonts
+            options.AddUserProfilePreference("profile.managed_default_content_settings.javascript", 2);  // Block fonts
 
             var driver = new ChromeDriver(service, options);
             driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(3);
+            ((ChromeDriver)driver).ExecuteCdpCommand("Network.setBlockedURLs", new Dictionary<string, object>
+            {
+                { "urls", new[] { "*.jpg", "*.png", "*.gif", "*.css", "*.woff", "*.mp4", "*.svg" } }
+            });
             try
             {
                 driver.Navigate().GoToUrl(businessUrl);
@@ -463,57 +495,74 @@ namespace WindowsFormsApp2
                 // Fetch social media links from the business website (e.g., from footer or social media icons)
                 var socialMediaSelectors = new List<string>
                 {
+                    "a[href*='mailto:']",
                     "a[href*='facebook.com']",
-                    "a[href*='x.com']",
+                    "a[href*='twitter.com']",
                     "a[href*='linkedin.com']",
                     "a[href*='instagram.com']",
                     "a[href*='youtube.com']",
-                    "a[href*='pinterest.com']",
+                    "a[href*='pinterest.com']"
                 };
-
+                bool isMailFetch = false;
                 foreach (var selector in socialMediaSelectors)
                 {
                     var elements = driver.FindElements(By.CssSelector(selector));
                     foreach (var element in elements)
                     {
                         var link = element.GetAttribute("href");
-                        var links = driver.FindElements(By.TagName("a"));
+                        //var links = driver.FindElements(By.TagName("a"));
                         if (!string.IsNullOrEmpty(link) && (link.Contains("http://") || link.Contains("https://")))
                         {
-                            bool isInvalidValid = 
-                                link == "https://www.linkedin.com/" || 
-                                link == "https://www.facebook.com/" || 
-                                link == "https://www.x.com/" || 
-                                link == "https://instagram.com/" || 
-                                link == "https://youtube.com/" || 
+                            bool isInvalidValid =
+                                link == "https://www.linkedin.com/" ||
+                                link == "https://www.facebook.com/" ||
+                                link == "https://www.twitter.com/" ||
+                                link == "https://instagram.com/" ||
+                                link == "https://youtube.com/" ||
                                 link == "https://pinterest.com/";
                             Uri uri = new Uri(link);
                             string host = uri.Host.Replace("www.", ""); // Remove "www."
                             string baseDomain = host.Split('.')[0];
                             if (isInvalidValid) link = string.Empty;
-                            if(!isInvalidValid)
+                            if (!isInvalidValid)
                             {
-                                if (!socialLinks.ContainsKey(baseDomain))
+                                if (!socialLinks.ContainsKey(baseDomain.Replace("twitter", "x")))
                                 {
-                                    socialLinks.Add(baseDomain, link);
+                                    socialLinks.Add(baseDomain.Replace("twitter", "x"), link);
                                 }
                             }
-                                
+
+                        } else if((!string.IsNullOrEmpty(link) && (link.Contains("mailto")))){
+                            if(!socialLinks.ContainsKey("emails"))
+                            {
+                                socialLinks.Add("emails", link.Replace("mailto:", ""));
+                            } else
+                            {
+                                string prevValue = socialLinks["emails"];
+                                string currentValue = link.Replace("mailto:", "");
+                                if (prevValue != currentValue)
+                                {
+                                    socialLinks["emails"] = prevValue + ", " + link.Replace("mailto:", "");
+                                }
+                            }
+                            isMailFetch = true;
                         }
                     }
                 }
-
-                var emails = FetchEmails(driver);
-
-                // Combine all emails into one string (comma-separated)
-                if (emails.Count > 0)
+                if (!isMailFetch)
                 {
-                    string combinedEmails = string.Join(", ", emails);
-                    socialLinks["emails"] = combinedEmails; // Single key for all emails
-                }
-                else
-                {
-                    socialLinks["emails"] = string.Empty;
+                    var emails = FetchEmails(driver);
+
+                    // Combine all emails into one string (comma-separated)
+                    if (emails.Count > 0)
+                    {
+                        string combinedEmails = string.Join(", ", emails);
+                        socialLinks["emails"] = combinedEmails; // Single key for all emails
+                    }
+                    else
+                    {
+                        socialLinks["emails"] = string.Empty;
+                    }
                 }
             }
             catch (Exception ex)
@@ -628,7 +677,7 @@ namespace WindowsFormsApp2
             //}
         }
 
-        private void ExportToExcel(System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, Dictionary<string, string> socialMedias, string hrefValue)> results)
+        private void ExportToExcel(System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string hrefValue)> results)
         {
             try
             {
@@ -642,17 +691,18 @@ namespace WindowsFormsApp2
                     worksheet.Cell(1, 5).Value = "Street_Address";
                     worksheet.Cell(1, 6).Value = "City";
                     worksheet.Cell(1, 7).Value = "Zip";
-                    worksheet.Cell(1, 8).Value = "Contact Number";
-                    worksheet.Cell(1, 9).Value = "Email";
-                    worksheet.Cell(1, 10).Value = "Website";
-                    worksheet.Cell(1, 11).Value = "Facebook";
-                    worksheet.Cell(1, 12).Value = "LinkedIn";
-                    worksheet.Cell(1, 13).Value = "Twitter";
-                    worksheet.Cell(1, 14).Value = "Youtube";
-                    worksheet.Cell(1, 15).Value = "Instagram";
-                    worksheet.Cell(1, 16).Value = "Pinterest";
-                    worksheet.Cell(1, 17).Value = "Rating";
-                    worksheet.Cell(1, 18).Value = "Review Count";
+                    worksheet.Cell(1, 8).Value = "Country";
+                    worksheet.Cell(1, 9).Value = "Contact Number";
+                    worksheet.Cell(1, 10).Value = "Email";
+                    worksheet.Cell(1, 11).Value = "Website";
+                    worksheet.Cell(1, 12).Value = "Facebook";
+                    worksheet.Cell(1, 13).Value = "LinkedIn";
+                    worksheet.Cell(1, 14).Value = "Twitter";
+                    worksheet.Cell(1, 15).Value = "Youtube";
+                    worksheet.Cell(1, 16).Value = "Instagram";
+                    worksheet.Cell(1, 17).Value = "Pinterest";
+                    worksheet.Cell(1, 18).Value = "Rating";
+                    worksheet.Cell(1, 19).Value = "Review Count";
 
                     for (int i = 0; i < results.Count; i++)
                     {
@@ -663,17 +713,18 @@ namespace WindowsFormsApp2
                         worksheet.Cell(i + 2, 5).Value = results[i].streetAddress;
                         worksheet.Cell(i + 2, 6).Value = results[i].city;
                         worksheet.Cell(i + 2, 7).Value = results[i].zip;
-                        worksheet.Cell(i + 2, 8).Value = results[i].ContactNumber;
-                        worksheet.Cell(i + 2, 9).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
-                        worksheet.Cell(i + 2, 10).Value = results[i].hrefValue;
-                        worksheet.Cell(i + 2, 11).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
-                        worksheet.Cell(i + 2, 12).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
-                        worksheet.Cell(i + 2, 13).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
-                        worksheet.Cell(i + 2, 14).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
-                        worksheet.Cell(i + 2, 15).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
-                        worksheet.Cell(i + 2, 16).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
-                        worksheet.Cell(i + 2, 17).Value = results[i].ReviewCount;
-                        worksheet.Cell(i + 2, 18).Value = results[i].Rating;
+                        worksheet.Cell(i + 2, 8).Value = results[i].country;
+                        worksheet.Cell(i + 2, 9).Value = results[i].ContactNumber;
+                        worksheet.Cell(i + 2, 10).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
+                        worksheet.Cell(i + 2, 11).Value = results[i].hrefValue;
+                        worksheet.Cell(i + 2, 12).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
+                        worksheet.Cell(i + 2, 13).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
+                        worksheet.Cell(i + 2, 14).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
+                        worksheet.Cell(i + 2, 15).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
+                        worksheet.Cell(i + 2, 16).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
+                        worksheet.Cell(i + 2, 17).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
+                        worksheet.Cell(i + 2, 18).Value = results[i].ReviewCount;
+                        worksheet.Cell(i + 2, 19).Value = results[i].Rating;
                     }
                     SaveFileDialog saveFileDialog = new SaveFileDialog();
                     // Set filter for Excel files
