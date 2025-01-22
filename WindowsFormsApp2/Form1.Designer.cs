@@ -1,20 +1,19 @@
 ﻿using System;
-using System.CodeDom.Compiler;
-using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using OpenQA.Selenium.Support.UI;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using ClosedXML.Excel;
-using DocumentFormat.OpenXml.Spreadsheet;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using WebDriverManager;
 using WebDriverManager.DriverConfigs.Impl;
+using SeleniumExtras.WaitHelpers;
 using Keys = OpenQA.Selenium.Keys;
 
 namespace WindowsFormsApp2
@@ -226,7 +225,6 @@ namespace WindowsFormsApp2
                 driver.Manage().Window.Maximize();
 
                 driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
-
                 foreach (string term in searchTerms)
                 {
                     if (cancellationToken.IsCancellationRequested)
@@ -235,176 +233,184 @@ namespace WindowsFormsApp2
                         break;
                     }
                     // Wait for the search box to load
-                    Thread.Sleep(2000);
                     var searchBox = driver.FindElement(By.Id("searchboxinput"));
                     searchBox.Clear();
                     searchBox.SendKeys(term);
                     searchBox.SendKeys(Keys.Enter);
-
-                    Thread.Sleep(4000); // Wait for search results to load
-
-                    var mapContainer = driver.FindElement(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
-                    var processedResults = new HashSet<string>();
-                    bool hasMoreResults = true;
-                    IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
-                    int lastHeight = 0;
-                    while (hasMoreResults)
+                    WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                    try
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            hasMoreResults = false;
-                            break;
-                        }
-                        // Extract search results
-                        
-                        var resultElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-                        int i = 0;
-                        ChromeDriverService service = ChromeDriverService.CreateDefaultService();
-                        service.HideCommandPromptWindow = true;
-                        foreach (var resultElement in resultElements)
+                        // Example: Wait for the search results container to be visible
+                        wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"))); // Adjust selector based on target element
+                        var mapContainer = driver.FindElement(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
+                        var processedResults = new HashSet<string>();
+                        bool hasMoreResults = true;
+                        IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
+                        int lastHeight = 0;
+                        while (hasMoreResults)
                         {
                             if (cancellationToken.IsCancellationRequested)
                             {
                                 hasMoreResults = false;
                                 break;
                             }
-                            try
+                            // Extract search results
+
+                            var resultElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
+                            int i = 0;
+                            ChromeDriverService service = ChromeDriverService.CreateDefaultService();
+                            service.HideCommandPromptWindow = true;
+                            foreach (var resultElement in resultElements)
                             {
-                                string reviewCount = string.Empty;
-                                string rating = string.Empty;
-                                string title = resultElement.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
-                                if (processedResults.Contains(title))
+                                if (cancellationToken.IsCancellationRequested)
                                 {
-                                    i++;
-                                    continue; // Skip already processed results
+                                    hasMoreResults = false;
+                                    break;
                                 }
-                                //lcr4fd S9kvJb
-                                Dictionary<string, string> keyValuePairs = new Dictionary<string, string>();
-                                var linkElement = resultElement.FindElements(By.ClassName("lcr4fd"));
-                                string hrefValue = string.Empty;
-                                
-                                processedResults.Add(title);
-                                var clickableElement = driver.FindElements(By.CssSelector("a.hfpxzc"));
-                               // ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
-                                int height = clickableElement[i].Size.Height;
-                                
-                                lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                                jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
-                                clickableElement[i].Click();
-                                i++;
-                                if (linkElement.Count > 0)
-                                {
-                                    hrefValue = linkElement[0].GetDomAttribute("href");
-                                    var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
-                                    keyValuePairs = await task;
-                                }
-                                //Thread.Sleep(500);
-                                var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
-                                if (reviewListText != null && reviewListText.Count > 1)
-                                {
-                                    reviewCount = reviewListText[0];
-                                    rating = reviewListText[1];
-                                }
-                                string category = string.Empty;
-                                string city = string.Empty;
-                                string zip = string.Empty;
-                                string country = string.Empty;
-                                string streetLocation = string.Empty;
-                                var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
-                                string location = detailsElems[0].FindElement(By.CssSelector(".Io6YTe.fontBodyMedium.kR99db.fdkmkc")).Text;
-                                string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
-                                var regex = new Regex(pattern);
-                                var match = regex.Match(location);
-                                var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
-                                if (match.Success)
-                                {
-                                    streetLocation = match.Groups["street"].Value;
-                                    city = match.Groups["city"].Value;
-                                    zip = match.Groups["zip"].Value;
-                                    country = match.Groups["country"].Value;
-                                }
-                                else
-                                {
-                                    streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
-                                }
-                                //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
-                                //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
-                                if (elements != null)
-                                {
-                                    category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
-                                    if (elements != null && category.Length > 0)
-                                    {
-                                        category = category.Split('·')[0];
-                                    }
-                                }
-                                string contactNumber = string.Empty;
                                 try
                                 {
-                                    contactNumber = resultElement.FindElement(By.ClassName("UsdlK")).Text;
+                                    string reviewCount = string.Empty;
+                                    string rating = string.Empty;
+                                    string title = resultElement.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
+                                    if (processedResults.Contains(title))
+                                    {
+                                        i++;
+                                        continue; // Skip already processed results
+                                    }
+                                    //lcr4fd S9kvJb
+                                    Dictionary<string, string> keyValuePairs = new Dictionary<string, string>();
+                                    var linkElement = resultElement.FindElements(By.ClassName("lcr4fd"));
+                                    string hrefValue = string.Empty;
+
+                                    processedResults.Add(title);
+                                    var clickableElement = driver.FindElements(By.CssSelector("a.hfpxzc"));
+                                    // ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
+                                    int height = clickableElement[i].Size.Height;
+
+                                    lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                                    jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
+                                    clickableElement[i].Click();
+                                    i++;
+                                    if (linkElement.Count > 0)
+                                    {
+                                        hrefValue = linkElement[0].GetDomAttribute("href");
+                                        var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
+                                        keyValuePairs = await task;
+                                    } else
+                                    {
+                                        Thread.Sleep(100);
+                                    }
+
+                                    var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
+                                    if (reviewListText != null && reviewListText.Count > 1)
+                                    {
+                                        reviewCount = reviewListText[0];
+                                        rating = reviewListText[1];
+                                    }
+                                    string category = string.Empty;
+                                    string city = string.Empty;
+                                    string zip = string.Empty;
+                                    string country = string.Empty;
+                                    string streetLocation = string.Empty;
+                                    var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
+                                    string location = detailsElems[0].FindElement(By.CssSelector(".Io6YTe.fontBodyMedium.kR99db.fdkmkc")).Text;
+                                    string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
+                                    var regex = new Regex(pattern);
+                                    var match = regex.Match(location);
+                                    var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
+                                    if (match.Success)
+                                    {
+                                        streetLocation = match.Groups["street"].Value;
+                                        city = match.Groups["city"].Value;
+                                        zip = match.Groups["zip"].Value;
+                                        country = match.Groups["country"].Value;
+                                    }
+                                    else
+                                    {
+                                        streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                    }
+                                    //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
+                                    //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
+                                    if (elements != null)
+                                    {
+                                        category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
+                                        if (elements != null && category.Length > 0)
+                                        {
+                                            category = category.Split('·')[0];
+                                        }
+                                    }
+                                    string contactNumber = string.Empty;
+                                    try
+                                    {
+                                        contactNumber = resultElement.FindElement(By.ClassName("UsdlK")).Text;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                    }
+
+                                    results.Add((term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue));
+                                    Invoke(new Action(() =>
+                                    {
+                                        dataGridView.Rows.Add(
+                                            dataGridView.Rows.Count + 1,
+                                            term, title, category, location, streetLocation.Replace("·", ""), city, zip, country, contactNumber,
+                                            keyValuePairs.ContainsKey("emails") ? keyValuePairs["emails"] : string.Empty,
+                                            hrefValue,
+                                            keyValuePairs.ContainsKey("facebook") ? keyValuePairs["facebook"] : string.Empty,
+                                            keyValuePairs.ContainsKey("linkedin") ? keyValuePairs["linkedin"] : string.Empty,
+                                            keyValuePairs.ContainsKey("x") ? keyValuePairs["x"] : string.Empty,
+                                            keyValuePairs.ContainsKey("youtube") ? keyValuePairs["youtube"] : string.Empty,
+                                            keyValuePairs.ContainsKey("instagram") ? keyValuePairs["instagram"] : string.Empty,
+                                            keyValuePairs.ContainsKey("pinterest") ? keyValuePairs["pinterest"] : string.Empty,
+                                            rating, reviewCount);
+
+                                    }));
+                                    //driver.Navigate().Back();
+                                    //driver.Navigate().Back();
+
                                 }
                                 catch (Exception ex)
                                 {
+                                    // Skip if any element is missing
+                                }
+                            }
+                            Thread.Sleep(3000);
+                            //double lastHeight = Convert.ToDouble(((IJavaScriptExecutor)driver).ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                            int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                            var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
+                            var t = newElements.Select(x =>
+                            {
+                                string txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
+                                if (!processedResults.Contains(txt))
+                                {
+                                    return txt;
+                                }
+                                else
+                                {
+                                    return string.Empty;
                                 }
 
-                                results.Add((term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue));
-                                Invoke(new Action(() =>
-                                {
-                                    dataGridView.Rows.Add(
-                                        dataGridView.Rows.Count + 1,
-                                        term, title, category, location, streetLocation.Replace("·", ""), city, zip, country, contactNumber, 
-                                        keyValuePairs.ContainsKey("emails") ? keyValuePairs["emails"] : string.Empty, 
-                                        hrefValue,
-                                        keyValuePairs.ContainsKey("facebook") ? keyValuePairs["facebook"] : string.Empty, 
-                                        keyValuePairs.ContainsKey("linkedin") ? keyValuePairs["linkedin"] : string.Empty, 
-                                        keyValuePairs.ContainsKey("x") ? keyValuePairs["x"] : string.Empty, 
-                                        keyValuePairs.ContainsKey("youtube") ? keyValuePairs["youtube"] : string.Empty, 
-                                        keyValuePairs.ContainsKey("instagram") ? keyValuePairs["instagram"] : string.Empty, 
-                                        keyValuePairs.ContainsKey("pinterest") ? keyValuePairs["pinterest"] : string.Empty, 
-                                        rating, reviewCount);
-
-                                }));
-                                //driver.Navigate().Back();
-                                //driver.Navigate().Back();
-                                
-                            }
-                            catch (Exception ex)
+                            }).ToList();
+                            t = t.Where(x => x.Length > 0).ToList();
+                            if (t.Count == 0)
                             {
-                                // Skip if any element is missing
+                                hasMoreResults = false;
                             }
-                        }
-                        Thread.Sleep(3000);
-                        //double lastHeight = Convert.ToDouble(((IJavaScriptExecutor)driver).ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                        int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                        var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-                        var t = newElements.Select(x =>
-                        {
-                            string txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
-                            if (!processedResults.Contains(txt))
+                            if (cancellationToken.IsCancellationRequested)
                             {
-                                return txt;
-                            } else
-                            {
-                                return string.Empty;
+                                //lblStatus.Text = "Crawling stopped.";
+                                hasMoreResults = false;
+                                break;
                             }
-                            
-                        }).ToList();
-                        t = t.Where(x => x.Length > 0).ToList();
-                        if (t.Count == 0)
-                        {
-                            hasMoreResults = false;
-                        }
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            //lblStatus.Text = "Crawling stopped.";
-                            hasMoreResults = false;
-                            break;
                         }
                     }
-
-                    
+                    catch (WebDriverTimeoutException)
+                    {
+                        Console.WriteLine("Timeout waiting for search results to load.");
+                    }   
                 }
 
-                driver.Quit();
+                //driver.Quit();
 
                 // Export results to Excel
                 //ExportToExcel(results);
@@ -483,7 +489,7 @@ namespace WindowsFormsApp2
             options.AddUserProfilePreference("profile.managed_default_content_settings.javascript", 2);  // Block fonts
 
             var driver = new ChromeDriver(service, options);
-            driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(3);
+            driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(30);
             ((ChromeDriver)driver).ExecuteCdpCommand("Network.setBlockedURLs", new Dictionary<string, object>
             {
                 { "urls", new[] { "*.jpg", "*.png", "*.gif", "*.css", "*.woff", "*.mp4", "*.svg" } }
@@ -639,42 +645,7 @@ namespace WindowsFormsApp2
 
         private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer)
         {
-            // Execute JavaScript to scroll the results container down (not just the window)
-            IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
-
-            // Get the map container (or search results container)
-
-            // Get the initial scroll height
-            int lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-            // Scroll down the results container
-            jsExecutor.ExecuteScript("arguments[0].scrollTop = arguments[0].scrollHeight", mapContainer);
-            Thread.Sleep(3000);
-            int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-            return newHeight > lastHeight;
-            //bool reachedEnd = false;
-
-            //while (!reachedEnd)
-            //{
-
-            //    // Wait for new results to load
-            //    Thread.Sleep(3000); // Adjust this time as necessary
-
-            //    // Get the new scroll height
-            //    int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-            //    Console.WriteLine($"New Height after Scroll: {newHeight}");
-
-            //    // If the height hasn't changed, we've reached the end of the results
-            //    if (newHeight == lastHeight)
-            //    {
-            //        reachedEnd = true; // No more results loaded
-            //        Console.WriteLine("Reached the end of the results.");
-            //    }
-            //    else
-            //    {
-            //        // Otherwise, update the height and continue scrolling
-            //        lastHeight = newHeight;
-            //    }
-            //}
+            return false;
         }
 
         private void ExportToExcel(System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string hrefValue)> results)
