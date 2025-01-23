@@ -119,7 +119,7 @@ namespace WindowsFormsApp2
             this.addLicenseMenuItem.Text = "Add License";
             this.addLicenseMenuItem.Click += new System.EventHandler(this.AddLicenseMenuItem_Click);
 
-            this.contactBotsolMenuItem.Text = "Contact Botsol";
+            this.contactBotsolMenuItem.Text = "Contact Crawler";
             this.contactBotsolMenuItem.Click += new System.EventHandler(this.ContactBotsolMenuItem_Click);
 
             this.customizeDataFieldsMenuItem.Text = "Customize Data Fields";
