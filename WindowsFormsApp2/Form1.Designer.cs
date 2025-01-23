@@ -18,6 +18,16 @@ using Keys = OpenQA.Selenium.Keys;
 
 namespace WindowsFormsApp2
 {
+    public class GridColumnConfig
+    {
+        public GridColumnConfig(string name, float? widht)
+        {
+            Name = name;            
+            Width = widht;            
+        }
+        public string Name { get; set; }
+        public int? Width { get; set; }
+    } 
     partial class Form1 : Form
     {
         private string[] searchTerms;
@@ -29,6 +39,28 @@ namespace WindowsFormsApp2
         private System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)> results;
         private DataGridView dataGridView;
         private CancellationTokenSource cancellationTokenSource;
+        private List<GridColumnConfig> dataGridColumns = new List<GridColumnConfig> {
+                new GridColumnConfig("#", 50),
+                new GridColumnConfig("Keyword", null),
+                new GridColumnConfig("Name", null),
+                new GridColumnConfig("Category", null),
+                new GridColumnConfig("Full_Address", 150),
+                new GridColumnConfig("Street_Address", null),
+                new GridColumnConfig("City", 70),
+                new GridColumnConfig("Zip", 70),
+                new GridColumnConfig("Country", null),
+                new GridColumnConfig("Contact Number", null),
+                new GridColumnConfig("Email", null),
+                new GridColumnConfig("Website", null),
+                new GridColumnConfig("Facebook", null),
+                new GridColumnConfig("Linkedin", null),
+                new GridColumnConfig("Twitter", null),
+                new GridColumnConfig("Youtube", null),
+                new GridColumnConfig("Instagram", null),
+                new GridColumnConfig("Pinterest", null),
+                new GridColumnConfig("Rating", null),
+                new GridColumnConfig("Review Count", null),
+            };
         //private System.Windows.Forms.DataGridView dataGridView = new System.Windows.Forms.DataGridView();
         //private DataTable resultsDataTable = new DataTable();
         /// <summary>
@@ -65,13 +97,6 @@ namespace WindowsFormsApp2
             this.exportButton = new System.Windows.Forms.Button();
             //((System.ComponentModel.ISupportInitialize)(this.dataGridView)).BeginInit();
             this.SuspendLayout();
-
-            //this.dataGridView.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            //this.dataGridView.Location = new System.Drawing.Point(12, 12);
-            //this.dataGridView.Name = "dataGridView";
-            //this.dataGridView.RowTemplate.Height = 24;
-            //this.dataGridView.Size = new System.Drawing.Size(760, 400);
-            //this.dataGridView.TabIndex = 0;
 
 
             this.lblStatus.AutoSize = true;
@@ -117,33 +142,17 @@ namespace WindowsFormsApp2
             this.dataGridView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             this.dataGridView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
             this.dataGridView.AutoResizeColumns();
-            this.dataGridView.ColumnCount = 20;
+            this.dataGridView.ColumnCount = dataGridColumns.Count;
             this.dataGridView.ReadOnly = true;
             this.dataGridView.AllowUserToAddRows = false;
-            this.dataGridView.Columns[0].Width = 50;
-            this.dataGridView.Columns[0].Name = "#";
-            this.dataGridView.Columns[1].Name = "Keyword";
-            this.dataGridView.Columns[2].Name = "Name";
-            this.dataGridView.Columns[3].Name = "Category";
-            this.dataGridView.Columns[4].Name = "Full_Address";
-            this.dataGridView.Columns[4].Width = 150;
-            this.dataGridView.Columns[5].Name = "Street_Address";
-            this.dataGridView.Columns[6].Name = "City";
-            this.dataGridView.Columns[7].Name = "Zip"; 
-            this.dataGridView.Columns[6].Width = 70;
-            this.dataGridView.Columns[7].Width = 70;
-            this.dataGridView.Columns[8].Name = "Country";
-            this.dataGridView.Columns[9].Name = "Contact Number";
-            this.dataGridView.Columns[10].Name = "Email";
-            this.dataGridView.Columns[11].Name = "Website";
-            this.dataGridView.Columns[12].Name = "Facebook";
-            this.dataGridView.Columns[13].Name = "Linkedin";
-            this.dataGridView.Columns[14].Name = "Twitter";
-            this.dataGridView.Columns[15].Name = "Youtube";
-            this.dataGridView.Columns[16].Name = "Instagram";
-            this.dataGridView.Columns[17].Name = "Pinterest";
-            this.dataGridView.Columns[18].Name = "Ratiung";
-            this.dataGridView.Columns[19].Name = "Review Count";
+            for(int index = 0; index < dataGridColumns.Count; index ++)
+            {
+                this.dataGridView.Columns[index].Name = dataGridColumns[index].Name;
+                if(dataGridColumns[index].Width != null)
+                {
+                    this.dataGridView.Columns[index].Width = Convert.ToInt32(dataGridColumns[index].Width);
+                }
+            }
             // 
             // Form1
             // 
@@ -475,20 +484,6 @@ namespace WindowsFormsApp2
             options.AddArgument("--enable-features=NetworkService,NetworkServiceInProcess");
             options.AddArgument("--enable-async-dns");
             options.AddArgument("--reduce-security-for-testing");
-            //options.AddLocalStatePreference("profile.managed_default_content_settings.images", 2);
-            //options.AddLocalStatePreference("profile.managed_default_content_settings.stylesheet", 2);
-            //options.AddLocalStatePreference("profile.managed_default_content_settings.fonts", 2);
-            //options.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
-            //options.AddUserProfilePreference("profile.default_content_setting_values.fonts", 2);
-            //options.AddUserProfilePreference("profile.default_content_setting_values.css", 2);
-            // Block unnecessary resources
-            //var prefs = new Dictionary<string, object>
-            //{
-            //    ["profile.managed_default_content_settings.images"] = 2, // Block images
-            //    ["profile.managed_default_content_settings.css"] = 2,    // Block CSS
-            //    ["profile.managed_default_content_settings.fonts"] = 2   // Block fonts
-            //};
-            //options.AddAdditionalOption("prefs", prefs);
 
             options.AddUserProfilePreference("profile.managed_default_content_settings.images", 2); // Block images
             options.AddUserProfilePreference("profile.managed_default_content_settings.css", 2);    // Block CSS
@@ -662,25 +657,10 @@ namespace WindowsFormsApp2
                 using (var workbook = new XLWorkbook())
                 {
                     var worksheet = workbook.Worksheets.Add("Results");
-                    worksheet.Cell(1, 1).Value = "Keyword";
-                    worksheet.Cell(1, 2).Value = "Name";
-                    worksheet.Cell(1, 3).Value = "Category";
-                    worksheet.Cell(1, 4).Value = "Full_Address";
-                    worksheet.Cell(1, 5).Value = "Street_Address";
-                    worksheet.Cell(1, 6).Value = "City";
-                    worksheet.Cell(1, 7).Value = "Zip";
-                    worksheet.Cell(1, 8).Value = "Country";
-                    worksheet.Cell(1, 9).Value = "Contact Number";
-                    worksheet.Cell(1, 10).Value = "Email";
-                    worksheet.Cell(1, 11).Value = "Website";
-                    worksheet.Cell(1, 12).Value = "Facebook";
-                    worksheet.Cell(1, 13).Value = "LinkedIn";
-                    worksheet.Cell(1, 14).Value = "Twitter";
-                    worksheet.Cell(1, 15).Value = "Youtube";
-                    worksheet.Cell(1, 16).Value = "Instagram";
-                    worksheet.Cell(1, 17).Value = "Pinterest";
-                    worksheet.Cell(1, 18).Value = "Rating";
-                    worksheet.Cell(1, 19).Value = "Review Count";
+                    for(int i = 1; i < dataGridColumns.Count; i++)
+                    {
+                        worksheet.Cell(1, i).Value = dataGridColumns[i].Name;
+                    }
 
                     for (int i = 0; i < results.Count; i++)
                     {
