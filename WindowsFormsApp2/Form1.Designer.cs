@@ -1,66 +1,36 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
-using OpenQA.Selenium.Support.UI;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using ClosedXML.Excel;
-using OpenQA.Selenium;
-using OpenQA.Selenium.Chrome;
-using WebDriverManager;
-using WebDriverManager.DriverConfigs.Impl;
-using SeleniumExtras.WaitHelpers;
-using Keys = OpenQA.Selenium.Keys;
 
 namespace WindowsFormsApp2
 {
-    public class GridColumnConfig
-    {
-        public GridColumnConfig(string name, int? widht)
-        {
-            Name = name;            
-            Width = widht;            
-        }
-        public string Name { get; set; }
-        public int? Width { get; set; }
-    } 
     partial class Form1 : Form
     {
-        private string[] searchTerms;
-        private System.Windows.Forms.Label lblStatus;
-        private System.Windows.Forms.Button btnUpload;
-        private System.Windows.Forms.Button btnStart;
-        private System.Windows.Forms.Button stopCrawlButton;
-        private System.Windows.Forms.Button exportButton;
-        private System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)> results;
+        private Button btnUpload;
+        private Button btnStart;
+        private Button stopCrawlButton;
+        private Button exportButton;
+        private GroupBox instructionsGroupBox;
+        private GroupBox progressGroupBox;
+        private TextBox instructionsTextBox;
+        private TextBox progressTextBox;
         private DataGridView dataGridView;
-        private CancellationTokenSource cancellationTokenSource;
-        private List<GridColumnConfig> dataGridColumns = new List<GridColumnConfig> {
-                new GridColumnConfig("#", 50),
-                new GridColumnConfig("Keyword", null),
-                new GridColumnConfig("Name", null),
-                new GridColumnConfig("Category", null),
-                new GridColumnConfig("Full_Address", 150),
-                new GridColumnConfig("Street_Address", null),
-                new GridColumnConfig("City", 70),
-                new GridColumnConfig("Zip", 70),
-                new GridColumnConfig("Country", null),
-                new GridColumnConfig("Contact Number", null),
-                new GridColumnConfig("Email", null),
-                new GridColumnConfig("Website", null),
-                new GridColumnConfig("Facebook", null),
-                new GridColumnConfig("Linkedin", null),
-                new GridColumnConfig("Twitter", null),
-                new GridColumnConfig("Youtube", null),
-                new GridColumnConfig("Instagram", null),
-                new GridColumnConfig("Pinterest", null),
-                new GridColumnConfig("Rating", null),
-                new GridColumnConfig("Review Count", null),
-            };
+        private ToolStrip toolStrip;
+        private ToolStripDropDownButton helpDropDownButton;
+        private ToolStripMenuItem helpMenuItem;
+        private ToolStripMenuItem instructionsMenuItem;
+        private ToolStripMenuItem addLicenseMenuItem;
+        private ToolStripMenuItem contactBotsolMenuItem;
+        private ToolStripMenuItem customizeDataFieldsMenuItem;
+        private ToolStripMenuItem changeCrawlerMenuItem;
+        private ToolStripMenuItem advancedOptionsMenuItem;
+        private ToolStripMenuItem checkForUpdatesMenuItem;
+        private ToolStripMenuItem aboutMenuItem;
         //private System.Windows.Forms.DataGridView dataGridView = new System.Windows.Forms.DataGridView();
         //private DataTable resultsDataTable = new DataTable();
         /// <summary>
@@ -89,24 +59,119 @@ namespace WindowsFormsApp2
         /// </summary>
         private void InitializeComponent()
         {
-            this.ClientSize = new System.Drawing.Size(1100, 600);
-            this.lblStatus = new System.Windows.Forms.Label();
-            this.btnUpload = new System.Windows.Forms.Button();
-            this.btnStart = new System.Windows.Forms.Button();
-            this.stopCrawlButton = new System.Windows.Forms.Button();
-            this.exportButton = new System.Windows.Forms.Button();
+            this.ClientSize = new Size(1100, 600);
+            this.btnUpload = new Button();
+            this.btnStart = new Button();
+            this.stopCrawlButton = new Button();
+            this.exportButton = new Button();
+            this.instructionsGroupBox = new GroupBox();
+            this.progressGroupBox = new GroupBox();
+            this.instructionsTextBox = new TextBox();
+            this.progressTextBox = new TextBox();
+            this.toolStrip = new ToolStrip();
+            this.helpMenuItem = new ToolStripMenuItem();
+            this.instructionsMenuItem = new ToolStripMenuItem();
+            this.addLicenseMenuItem = new ToolStripMenuItem();
+            this.contactBotsolMenuItem = new ToolStripMenuItem();
+            this.customizeDataFieldsMenuItem = new ToolStripMenuItem();
+            this.changeCrawlerMenuItem = new ToolStripMenuItem();
+            this.advancedOptionsMenuItem = new ToolStripMenuItem();
+            this.checkForUpdatesMenuItem = new ToolStripMenuItem();
+            this.aboutMenuItem = new ToolStripMenuItem();
+            this.helpDropDownButton = new ToolStripDropDownButton();
             //((System.ComponentModel.ISupportInitialize)(this.dataGridView)).BeginInit();
             this.SuspendLayout();
 
+            // 
+            // ToolStrip
+            // 
+            this.toolStrip.Dock = System.Windows.Forms.DockStyle.None; // Allow manual positioning
+            this.toolStrip.Location = new System.Drawing.Point(this.ClientSize.Width - 112, 10); // Adjust based on form width
+            this.toolStrip.Anchor = AnchorStyles.Top | AnchorStyles.Right; // Anchor to the top-right
+            this.toolStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.helpDropDownButton
+            });
 
-            this.lblStatus.AutoSize = true;
-            this.lblStatus.Location = new System.Drawing.Point(12, 50); // Position it appropriately
-            this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(70, 13); // Adjust size as needed
-            this.lblStatus.TabIndex = 2;
-            this.lblStatus.Text = "Status: Idle";
+            // 
+            // Help DropDownButton
+            // 
+            this.helpDropDownButton.Text = "Help";
+            this.helpDropDownButton.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.instructionsMenuItem,
+            this.addLicenseMenuItem,
+            this.contactBotsolMenuItem,
+            this.customizeDataFieldsMenuItem,
+            this.changeCrawlerMenuItem,
+            this.advancedOptionsMenuItem,
+            this.checkForUpdatesMenuItem,
+            this.aboutMenuItem
+            });
 
-            this.btnUpload.Location = new System.Drawing.Point(20, 20); // Set position
+            this.helpDropDownButton.DropDownDirection = ToolStripDropDownDirection.Left; // Open the menu on the left side
+
+
+            // 
+            // Dropdown Items
+            // 
+            this.instructionsMenuItem.Text = "Instructions";
+            this.instructionsMenuItem.Click += new System.EventHandler(this.InstructionsMenuItem_Click);
+
+            this.addLicenseMenuItem.Text = "Add License";
+            this.addLicenseMenuItem.Click += new System.EventHandler(this.AddLicenseMenuItem_Click);
+
+            this.contactBotsolMenuItem.Text = "Contact Botsol";
+            this.contactBotsolMenuItem.Click += new System.EventHandler(this.ContactBotsolMenuItem_Click);
+
+            this.customizeDataFieldsMenuItem.Text = "Customize Data Fields";
+            this.customizeDataFieldsMenuItem.Click += new System.EventHandler(this.CustomizeDataFieldsMenuItem_Click);
+
+            this.changeCrawlerMenuItem.Text = "Change Crawler";
+            this.changeCrawlerMenuItem.Click += new System.EventHandler(this.ChangeCrawlerMenuItem_Click);
+
+            this.advancedOptionsMenuItem.Text = "Advanced Options";
+            this.advancedOptionsMenuItem.Click += new System.EventHandler(this.AdvancedOptionsMenuItem_Click);
+
+            this.checkForUpdatesMenuItem.Text = "Check For Updates";
+            this.checkForUpdatesMenuItem.Click += new System.EventHandler(this.CheckForUpdatesMenuItem_Click);
+
+            this.aboutMenuItem.Text = "About";
+            this.aboutMenuItem.Click += new System.EventHandler(this.AboutMenuItem_Click);
+
+            // 
+            // instructionsGroupBox
+            // 
+            this.instructionsGroupBox.Text = "Instructions";
+            this.instructionsGroupBox.Location = new System.Drawing.Point(10, 10); // Top-left corner
+            this.instructionsGroupBox.Controls.Add(this.instructionsTextBox);
+
+            // 
+            // instructionsTextBox
+            // 
+            this.instructionsTextBox.Multiline = true;
+            this.instructionsTextBox.ReadOnly = true;
+            this.instructionsTextBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.instructionsTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.instructionsTextBox.Text = "The bot will open a Chrome window...\r\n" + // Add your instructions here
+                                        "* FREE version only extracts 20 results...\r\n" +
+                                        "* Make sure language is set to English...";
+
+            // 
+            // progressGroupBox
+            // 
+            this.progressGroupBox.Text = "Progress";
+            this.progressGroupBox.Controls.Add(this.progressTextBox);
+
+            // 
+            // progressTextBox
+            // 
+            this.progressTextBox.Multiline = true;
+            this.progressTextBox.ReadOnly = true;
+            this.progressTextBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.progressTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.progressTextBox.ForeColor = Color.DarkBlue; // Set text color to blue
+            this.progressTextBox.BackColor = Color.White; // Optional: Ensure background is white for contrast
+
+            this.btnUpload.Location = new System.Drawing.Point(10, 180); // Set position
             this.btnUpload.Name = "btnUpload";
             this.btnUpload.Size = new System.Drawing.Size(150, 40); // Set size
             this.btnUpload.TabIndex = 0;
@@ -114,7 +179,7 @@ namespace WindowsFormsApp2
             this.btnUpload.UseVisualStyleBackColor = true;
             this.btnUpload.Click += new System.EventHandler(this.btnUpload_Click);
 
-            this.btnStart.Location = new System.Drawing.Point(200, 20); // Set position
+            this.btnStart.Location = new System.Drawing.Point(180, 180); // Set position
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(150, 40); // Set size
             this.btnStart.TabIndex = 1;
@@ -122,37 +187,37 @@ namespace WindowsFormsApp2
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
 
-            this.stopCrawlButton.Location = new System.Drawing.Point(370, 20); // Adjust position
+            this.stopCrawlButton.Location = new System.Drawing.Point(350, 180); // Adjust position
             this.stopCrawlButton.Name = "stopCrawlButton";
             this.stopCrawlButton.Size = new System.Drawing.Size(100, 40); // Adjust size
             this.stopCrawlButton.Text = "Stop Crawl";
             this.stopCrawlButton.UseVisualStyleBackColor = true;
             this.stopCrawlButton.Click += new System.EventHandler(this.stopCrawlButton_Click);
             
-            this.exportButton.Location = new System.Drawing.Point(500, 20); // Adjust position
+            this.exportButton.Location = new System.Drawing.Point(470, 180); // Adjust position
             this.exportButton.Name = "exportDataButton";
             this.exportButton.Size = new System.Drawing.Size(100, 40); // Adjust size
             this.exportButton.Text = "Export";
             this.exportButton.UseVisualStyleBackColor = true;
             this.exportButton.Click += new System.EventHandler(this.exportDataButton_Click);
 
+            //Panel panel = new Panel
+            //{
+            //    Dock = DockStyle.Fill // Fill remaining space after the buttons
+            //};
             this.dataGridView = new System.Windows.Forms.DataGridView();
-            this.dataGridView.Location = new System.Drawing.Point(20, 100);
-            this.dataGridView.Size = new System.Drawing.Size(1000, 400);
+            //this.dataGridView.Dock = DockStyle.Fill;
+            this.dataGridView.Location = new System.Drawing.Point(10, 260);
+            AdjustDataGridViewHeight();
             this.dataGridView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             this.dataGridView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
             this.dataGridView.AutoResizeColumns();
-            this.dataGridView.ColumnCount = dataGridColumns.Count;
+            //this.dataGridView.ColumnCount = SharedDataTableModel.SelectedFields.Count;
+            SharedDataTableModel.SelectedFields = SharedDataTableModel.DataGridColumns;
             this.dataGridView.ReadOnly = true;
             this.dataGridView.AllowUserToAddRows = false;
-            for(int index = 0; index < dataGridColumns.Count; index ++)
-            {
-                this.dataGridView.Columns[index].Name = dataGridColumns[index].Name;
-                if(dataGridColumns[index].Width != null)
-                {
-                    this.dataGridView.Columns[index].Width = Convert.ToInt32(dataGridColumns[index].Width);
-                }
-            }
+            UpdateDataTableColumns();
+            //panel.Controls.Add(dataGridView);
             // 
             // Form1
             // 
@@ -160,7 +225,10 @@ namespace WindowsFormsApp2
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             //this.ClientSize = new System.Drawing.Size(400, 200); // Adjust size as needed
             //this.Controls.Add(this.dataGridView);
-            this.Controls.Add(this.lblStatus);
+            //this.Controls.Add(panel);
+            this.Controls.Add(this.toolStrip); // Add the MenuStrip to the form
+            this.Controls.Add(this.instructionsGroupBox);
+            this.Controls.Add(this.progressGroupBox);
             this.Controls.Add(this.btnUpload);
             this.Controls.Add(this.btnStart);
             this.Controls.Add(this.stopCrawlButton);
@@ -176,18 +244,26 @@ namespace WindowsFormsApp2
 
         #endregion
 
-        private void stopCrawlButton_Click(object sender, EventArgs e)
+        private void AdjustDataGridViewHeight()
         {
-            if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
-            {
-                cancellationTokenSource.Cancel();
-                lblStatus.Text = "Stopping crawl...";
-            }
-        }
-        
-        private void exportDataButton_Click(object sender, EventArgs e)
-        {
-            ExportToExcel(results);
+            int formWidth = this.ClientSize.Width;
+            int groupBoxWidth = (formWidth - 30) / 2; // 30 accounts for margins (10px left, 10px middle gap, 10px right)
+
+            // Instructions GroupBox
+            this.instructionsGroupBox.Size = new System.Drawing.Size(groupBoxWidth, 150); // 150px height
+            this.instructionsGroupBox.Location = new System.Drawing.Point(10, 25);
+
+            // Progress GroupBox
+            this.progressGroupBox.Size = new System.Drawing.Size(groupBoxWidth, 150); // Match height
+            this.progressGroupBox.Location = new System.Drawing.Point(20 + groupBoxWidth, 25); // Offset by left margin + width of first GroupBox
+
+            int topButtonsBottom = btnUpload.Bottom; // Get the bottom position of the topmost button
+            int bottomPadding = 30; // Add some padding at the bottom
+            int availableHeight = this.ClientSize.Height - topButtonsBottom - bottomPadding;
+            dataGridView.Width = groupBoxWidth*2;
+            // Set DataGridView's top position and height
+            dataGridView.Top = topButtonsBottom + 15; // Add some padding below the buttons
+            dataGridView.Height = availableHeight;
         }
 
         private void btnUpload_Click(object sender, EventArgs e)
@@ -200,7 +276,10 @@ namespace WindowsFormsApp2
                     try
                     {
                         searchTerms = File.ReadAllLines(openFileDialog.FileName).Select(line => line.Trim()).ToArray();
-                        lblStatus.Text = $"Loaded {searchTerms.Length} search terms.";
+                        string selectedFileName = openFileDialog.FileName;
+                        string fileNameOnly = System.IO.Path.GetFileName(selectedFileName); // Get only the file name
+                        UpdateProgress($"File Selected: {fileNameOnly}");
+                        UpdateProgress($"Loaded {searchTerms.Length} search terms.");
                     }
                     catch (Exception ex)
                     {
@@ -217,8 +296,7 @@ namespace WindowsFormsApp2
                 MessageBox.Show("Please upload a file with search terms first.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-
-            lblStatus.Text = "Crawling started...";
+            UpdateProgress("Crawling started...");
             //InitializeDataTable();
             if (cancellationTokenSource != null)
             {
@@ -226,480 +304,69 @@ namespace WindowsFormsApp2
             }
             cancellationTokenSource = new CancellationTokenSource();
             dataGridView.Rows.Clear();
+            UpdateProgress("", true);
             results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)>();
             new Thread(async () => await StartCrawlingAsync(cancellationTokenSource.Token)).Start();
         }
 
-
-        private async Task StartCrawlingAsync(CancellationToken cancellationToken)
+        // Menu Item Event Handlers
+        private void InstructionsMenuItem_Click(object sender, EventArgs e)
         {
-            try
-            {
-                new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
-                ChromeOptions options = new ChromeOptions();
-                IWebDriver driver = new ChromeDriver(options);
-                driver.Manage().Window.Maximize();
+            MessageBox.Show("The bot will open a Chrome window to search for businesses...", "Instructions");
+        }
 
-                driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
-                foreach (string term in searchTerms)
+        private void AddLicenseMenuItem_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Add License functionality is not yet implemented.", "Add License");
+        }
+
+        private void ContactBotsolMenuItem_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("You can contact Botsol via support@example.com.", "Contact Botsol");
+        }
+
+        private void CustomizeDataFieldsMenuItem_Click(object sender, EventArgs e)
+        {
+            // Open the new form with checkboxes
+            CustomizeDataFieldsForm customizeForm = new CustomizeDataFieldsForm();
+            customizeForm.ShowDialog(); // Open as a modal dialog
+
+            UpdateDataTableColumns();
+        }
+
+        private void UpdateDataTableColumns()
+        {
+            // Clear existing columns
+            dataGridView.Columns.Clear();
+
+            for (int index = 0; index < SharedDataTableModel.SelectedFields.Count; index++)
+            {
+                this.dataGridView.Columns.Add(SharedDataTableModel.SelectedFields[index].Name, SharedDataTableModel.SelectedFields[index].Name);
+                if (SharedDataTableModel.SelectedFields[index].Width != null)
                 {
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        //lblStatus.Text = "Crawling stopped.";
-                        break;
-                    }
-                    // Wait for the search box to load
-                    var searchBox = driver.FindElement(By.Id("searchboxinput"));
-                    searchBox.Clear();
-                    searchBox.SendKeys(term);
-                    searchBox.SendKeys(Keys.Enter);
-                    WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
-                    try
-                    {
-                        // Example: Wait for the search results container to be visible
-                        wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"))); // Adjust selector based on target element
-                        var mapContainer = driver.FindElement(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
-                        var processedResults = new HashSet<string>();
-                        bool hasMoreResults = true;
-                        IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
-                        int lastHeight = 0;
-                        while (hasMoreResults)
-                        {
-                            if (cancellationToken.IsCancellationRequested)
-                            {
-                                hasMoreResults = false;
-                                break;
-                            }
-                            // Extract search results
-
-                            var resultElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-                            int i = 0;
-                            ChromeDriverService service = ChromeDriverService.CreateDefaultService();
-                            service.HideCommandPromptWindow = true;
-                            foreach (var resultElement in resultElements)
-                            {
-                                if (cancellationToken.IsCancellationRequested)
-                                {
-                                    hasMoreResults = false;
-                                    break;
-                                }
-                                try
-                                {
-                                    string reviewCount = string.Empty;
-                                    string rating = string.Empty;
-                                    string title = resultElement.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
-                                    if (processedResults.Contains(title))
-                                    {
-                                        i++;
-                                        continue; // Skip already processed results
-                                    }
-                                    //lcr4fd S9kvJb
-                                    Dictionary<string, string> keyValuePairs = new Dictionary<string, string>();
-                                    var linkElement = resultElement.FindElements(By.ClassName("lcr4fd"));
-                                    string hrefValue = string.Empty;
-
-                                    processedResults.Add(title);
-                                    var clickableElement = driver.FindElements(By.CssSelector("a.hfpxzc"));
-                                    // ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
-                                    int height = clickableElement[i].Size.Height;
-
-                                    lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                                    jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
-                                    clickableElement[i].Click();
-                                    i++;
-                                    if (linkElement.Count > 0)
-                                    {
-                                        hrefValue = linkElement[0].GetDomAttribute("href");
-                                        var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
-                                        keyValuePairs = await task;
-                                    } else
-                                    {
-                                        Thread.Sleep(100);
-                                    }
-
-                                    var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
-                                    if (reviewListText != null && reviewListText.Count > 1)
-                                    {
-                                        reviewCount = reviewListText[0];
-                                        rating = reviewListText[1];
-                                    }
-                                    string category = string.Empty;
-                                    string city = string.Empty;
-                                    string zip = string.Empty;
-                                    string country = string.Empty;
-                                    string streetLocation = string.Empty;
-                                    var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
-                                    string location = detailsElems[0].FindElement(By.CssSelector(".Io6YTe.fontBodyMedium.kR99db.fdkmkc")).Text;
-                                    string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
-                                    var regex = new Regex(pattern);
-                                    var match = regex.Match(location);
-                                    var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
-                                    if (match.Success)
-                                    {
-                                        streetLocation = match.Groups["street"].Value;
-                                        city = match.Groups["city"].Value;
-                                        zip = match.Groups["zip"].Value;
-                                        country = match.Groups["country"].Value;
-                                    }
-                                    else
-                                    {
-                                        streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
-                                    }
-                                    //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
-                                    //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
-                                    if (elements != null)
-                                    {
-                                        category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
-                                        if (elements != null && category.Length > 0)
-                                        {
-                                            category = category.Split('·')[0];
-                                        }
-                                    }
-                                    string contactNumber = string.Empty;
-                                    try
-                                    {
-                                        contactNumber = resultElement.FindElement(By.ClassName("UsdlK")).Text;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                    }
-
-                                    results.Add((term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue));
-                                    Invoke(new Action(() =>
-                                    {
-                                        dataGridView.Rows.Add(
-                                            dataGridView.Rows.Count + 1,
-                                            term, title, category, location, streetLocation.Replace("·", ""), city, zip, country, contactNumber,
-                                            keyValuePairs.ContainsKey("emails") ? keyValuePairs["emails"] : string.Empty,
-                                            hrefValue,
-                                            keyValuePairs.ContainsKey("facebook") ? keyValuePairs["facebook"] : string.Empty,
-                                            keyValuePairs.ContainsKey("linkedin") ? keyValuePairs["linkedin"] : string.Empty,
-                                            keyValuePairs.ContainsKey("x") ? keyValuePairs["x"] : string.Empty,
-                                            keyValuePairs.ContainsKey("youtube") ? keyValuePairs["youtube"] : string.Empty,
-                                            keyValuePairs.ContainsKey("instagram") ? keyValuePairs["instagram"] : string.Empty,
-                                            keyValuePairs.ContainsKey("pinterest") ? keyValuePairs["pinterest"] : string.Empty,
-                                            rating, reviewCount);
-
-                                    }));
-                                    //driver.Navigate().Back();
-                                    //driver.Navigate().Back();
-
-                                }
-                                catch (Exception ex)
-                                {
-                                    // Skip if any element is missing
-                                }
-                            }
-                            Thread.Sleep(3000);
-                            //double lastHeight = Convert.ToDouble(((IJavaScriptExecutor)driver).ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                            int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                            var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-                            var t = newElements.Select(x =>
-                            {
-                                string txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
-                                if (!processedResults.Contains(txt))
-                                {
-                                    return txt;
-                                }
-                                else
-                                {
-                                    return string.Empty;
-                                }
-
-                            }).ToList();
-                            t = t.Where(x => x.Length > 0).ToList();
-                            if (t.Count == 0)
-                            {
-                                hasMoreResults = false;
-                            }
-                            if (cancellationToken.IsCancellationRequested)
-                            {
-                                //lblStatus.Text = "Crawling stopped.";
-                                hasMoreResults = false;
-                                break;
-                            }
-                        }
-                    }
-                    catch (WebDriverTimeoutException)
-                    {
-                        Console.WriteLine("Timeout waiting for search results to load.");
-                    }   
+                    this.dataGridView.Columns[index].Width = Convert.ToInt32(SharedDataTableModel.SelectedFields[index].Width);
                 }
-
-                //driver.Quit();
-
-                // Export results to Excel
-                //ExportToExcel(results);
-
-                Invoke(new Action(() => lblStatus.Text = "Crawling finished."));
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error during crawling: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Invoke(new Action(() => lblStatus.Text = "Error occurred."));
             }
         }
 
-        private List<string> GetRatingReview(string input)
+        private void ChangeCrawlerMenuItem_Click(object sender, EventArgs e)
         {
-            List<string>  ratings = new List<string>();
-            string pattern = @"(\d+(\.\d+)?)(\((\d+)\))?";
-
-            // Apply regex match
-            Match match = Regex.Match(input, pattern);
-
-            if (match.Success)
-            {
-                string numberBeforeParentheses = match.Groups[1].Value; // The part before the parentheses (e.g., ৫.০)
-                string numberInsideParentheses = match.Groups[4].Value; // The number inside the parentheses (e.g., ৯)
-                ratings.Add(numberBeforeParentheses);
-                ratings.Add(numberInsideParentheses);
-                // If there's no number inside parentheses, we can set it to an empty string or handle it accordingly
-                if (string.IsNullOrEmpty(numberInsideParentheses))
-                {
-                    ratings.Add("No reviews"); // You can define your own default value here
-                }
-            }
-            else
-            {
-                ratings.Add("No reviews");
-            }
-
-            return ratings;
+            MessageBox.Show("Change Crawler functionality is not yet implemented.", "Change Crawler");
         }
 
-        public Dictionary<string, string> FetchSocialMediaLinks(string businessUrl, ChromeDriverService service)
+        private void AdvancedOptionsMenuItem_Click(object sender, EventArgs e)
         {
-            var socialLinks = new Dictionary<string, string>();
-            if (businessUrl == null || businessUrl.Length == 0) {  return socialLinks; }
-            // Launch a new browser (this could be in a separate ChromeDriver instance)
-            var options = new ChromeOptions();
-            options.PageLoadStrategy = PageLoadStrategy.Eager;
-            options.AddArgument("--headless");                // Run in headless mode
-            options.AddArgument("--disable-gpu");             // For better performance
-            options.AddArgument("--disable-extensions");      // Disable unnecessary extensions
-            options.AddArgument("--no-sandbox");              // Disable sandbox mode
-            options.AddArgument("--log-level=3");
-            options.AddArgument("--disable-popup-blocking");
-            options.AddArgument("--enable-features=NetworkService,NetworkServiceInProcess");
-            options.AddArgument("--enable-async-dns");
-            options.AddArgument("--reduce-security-for-testing");
-
-            options.AddUserProfilePreference("profile.managed_default_content_settings.images", 2); // Block images
-            options.AddUserProfilePreference("profile.managed_default_content_settings.css", 2);    // Block CSS
-            options.AddUserProfilePreference("profile.managed_default_content_settings.fonts", 2);  // Block fonts
-            options.AddUserProfilePreference("profile.managed_default_content_settings.javascript", 2);  // Block fonts
-
-            var driver = new ChromeDriver(service, options);
-            driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(30);
-            ((ChromeDriver)driver).ExecuteCdpCommand("Network.setBlockedURLs", new Dictionary<string, object>
-            {
-                { "urls", new[] { "*.jpg", "*.png", "*.gif", "*.css", "*.woff", "*.mp4", "*.svg" } }
-            });
-            try
-            {
-                driver.Navigate().GoToUrl(businessUrl);
-
-                // Fetch social media links from the business website (e.g., from footer or social media icons)
-                var socialMediaSelectors = new List<string>
-                {
-                    "a[href*='mailto:']",
-                    "a[href*='facebook.com']",
-                    "a[href*='twitter.com']",
-                    "a[href*='linkedin.com']",
-                    "a[href*='instagram.com']",
-                    "a[href*='youtube.com']",
-                    "a[href*='pinterest.com']"
-                };
-                bool isMailFetch = false;
-                foreach (var selector in socialMediaSelectors)
-                {
-                    var elements = driver.FindElements(By.CssSelector(selector));
-                    foreach (var element in elements)
-                    {
-                        var link = element.GetAttribute("href");
-                        //var links = driver.FindElements(By.TagName("a"));
-                        if (!string.IsNullOrEmpty(link) && (link.Contains("http://") || link.Contains("https://")))
-                        {
-                            bool isInvalidValid =
-                                link == "https://www.linkedin.com/" ||
-                                link == "https://www.facebook.com/" ||
-                                link == "https://www.twitter.com/" ||
-                                link == "https://instagram.com/" ||
-                                link == "https://youtube.com/" ||
-                                link == "https://pinterest.com/";
-                            Uri uri = new Uri(link);
-                            string host = uri.Host.Replace("www.", ""); // Remove "www."
-                            string baseDomain = host.Split('.')[0];
-                            if (isInvalidValid) link = string.Empty;
-                            if (!isInvalidValid)
-                            {
-                                if (!socialLinks.ContainsKey(baseDomain.Replace("twitter", "x")))
-                                {
-                                    socialLinks.Add(baseDomain.Replace("twitter", "x"), link);
-                                }
-                            }
-
-                        } else if((!string.IsNullOrEmpty(link) && (link.Contains("mailto")))){
-                            if(!socialLinks.ContainsKey("emails"))
-                            {
-                                socialLinks.Add("emails", link.Replace("mailto:", ""));
-                            } else
-                            {
-                                string prevValue = socialLinks["emails"];
-                                string currentValue = link.Replace("mailto:", "");
-                                if (prevValue != currentValue)
-                                {
-                                    socialLinks["emails"] = prevValue + ", " + link.Replace("mailto:", "");
-                                }
-                            }
-                            isMailFetch = true;
-                        }
-                    }
-                }
-                if (!isMailFetch)
-                {
-                    var emails = FetchEmails(driver);
-
-                    // Combine all emails into one string (comma-separated)
-                    if (emails.Count > 0)
-                    {
-                        string combinedEmails = string.Join(", ", emails);
-                        socialLinks["emails"] = combinedEmails; // Single key for all emails
-                    }
-                    else
-                    {
-                        socialLinks["emails"] = string.Empty;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching social media links for {businessUrl}: {ex.Message}");
-            }
-            finally
-            {
-                driver.Quit();
-            }
-
-            return socialLinks;
+            MessageBox.Show("Advanced Options functionality is not yet implemented.", "Advanced Options");
         }
 
-        public static List<string> FetchEmails(IWebDriver driver)
+        private void CheckForUpdatesMenuItem_Click(object sender, EventArgs e)
         {
-            List<string> emails = new List<string>();
-            var links = driver.FindElements(By.TagName("a"));
-            string emailPattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}";
-            var elements = driver.FindElements(By.XPath("//*[text()]"));
-            foreach (var element in elements)
-            {
-                try
-                {
-                    string text = element.Text;
-
-                    if (!string.IsNullOrEmpty(text))
-                    {
-                        // Match all email-like patterns in the text
-                        var matches = Regex.Matches(text, emailPattern);
-                        foreach (Match match in matches)
-                        {
-                            string email = match.Value;
-
-                            // Avoid duplicates
-                            if (!emails.Contains(email))
-                            {
-                                emails.Add(email);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error processing element: {ex.Message}");
-                    return emails;
-                }
-            }
-            //foreach (var link in links)
-            //{
-            //    try
-            //    {
-            //        string href = link.GetAttribute("href");
-
-            //        if (!string.IsNullOrEmpty(href) && href.StartsWith("mailto:"))
-            //        {
-            //            string email = href.Replace("mailto:", "").Trim();
-            //            if (!emails.Contains(email) && Regex.IsMatch(email, emailPattern))
-            //            {
-            //                emails.Add(email);
-            //            }
-            //        }
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        Console.WriteLine($"Error processing link: {ex.Message}");
-            //    }
-            //}
-
-            return emails;
+            MessageBox.Show("Check For Updates functionality is not yet implemented.", "Check For Updates");
         }
 
-
-
-        private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer)
+        private void AboutMenuItem_Click(object sender, EventArgs e)
         {
-            return false;
-        }
-
-        private void ExportToExcel(System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string hrefValue)> results)
-        {
-            try
-            {
-                using (var workbook = new XLWorkbook())
-                {
-                    var worksheet = workbook.Worksheets.Add("Results");
-                    for(int i = 1; i < dataGridColumns.Count; i++)
-                    {
-                        worksheet.Cell(1, i).Value = dataGridColumns[i].Name;
-                    }
-
-                    for (int i = 0; i < results.Count; i++)
-                    {
-                        worksheet.Cell(i + 2, 1).Value = results[i].SearchTerm;
-                        worksheet.Cell(i + 2, 2).Value = results[i].ResultTitle;
-                        worksheet.Cell(i + 2, 3).Value = results[i].Category;
-                        worksheet.Cell(i + 2, 4).Value = results[i].Address;
-                        worksheet.Cell(i + 2, 5).Value = results[i].streetAddress;
-                        worksheet.Cell(i + 2, 6).Value = results[i].city;
-                        worksheet.Cell(i + 2, 7).Value = results[i].zip;
-                        worksheet.Cell(i + 2, 8).Value = results[i].country;
-                        worksheet.Cell(i + 2, 9).Value = results[i].ContactNumber;
-                        worksheet.Cell(i + 2, 10).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
-                        worksheet.Cell(i + 2, 11).Value = results[i].hrefValue;
-                        worksheet.Cell(i + 2, 12).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
-                        worksheet.Cell(i + 2, 13).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
-                        worksheet.Cell(i + 2, 14).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
-                        worksheet.Cell(i + 2, 15).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
-                        worksheet.Cell(i + 2, 16).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
-                        worksheet.Cell(i + 2, 17).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
-                        worksheet.Cell(i + 2, 18).Value = results[i].ReviewCount;
-                        worksheet.Cell(i + 2, 19).Value = results[i].Rating;
-                    }
-                    SaveFileDialog saveFileDialog = new SaveFileDialog();
-                    // Set filter for Excel files
-                    saveFileDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*";
-                    saveFileDialog.DefaultExt = "xlsx";  // Default extension
-                    if (saveFileDialog.ShowDialog() == DialogResult.OK)
-                    {
-                        string filePath = saveFileDialog.FileName;
-                        workbook.SaveAs(filePath);
-                        MessageBox.Show("File exported successfully!", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error exporting to Excel: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            MessageBox.Show("Codezzi Crawler Version 1.0", "About");
         }
     }
 }
