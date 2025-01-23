@@ -20,7 +20,7 @@ namespace WindowsFormsApp2
 {
     public class GridColumnConfig
     {
-        public GridColumnConfig(string name, float? widht)
+        public GridColumnConfig(string name, int? widht)
         {
             Name = name;            
             Width = widht;            
