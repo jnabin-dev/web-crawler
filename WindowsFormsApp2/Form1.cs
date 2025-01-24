@@ -15,6 +15,7 @@ using WebDriverManager.DriverConfigs.Impl;
 using WebDriverManager;
 using Keys = OpenQA.Selenium.Keys;
 using DocumentFormat.OpenXml.Spreadsheet;
+using System.Web;
 
 namespace WindowsFormsApp2
 {
@@ -104,7 +105,7 @@ namespace WindowsFormsApp2
                     }
                 }
 
-                driver.Quit();
+                //driver.Quit();
 
                 // Export results to Excel
                 //ExportToExcel(results);
@@ -418,7 +419,7 @@ namespace WindowsFormsApp2
                         {
                             if (!socialLinks.ContainsKey("emails"))
                             {
-                                socialLinks.Add("emails", link.Replace("mailto:", ""));
+                                socialLinks.Add("emails", ProcessEmail(link));
                             }
                             else
                             {
@@ -426,7 +427,7 @@ namespace WindowsFormsApp2
                                 string currentValue = link.Replace("mailto:", "");
                                 if (prevValue != currentValue)
                                 {
-                                    socialLinks["emails"] = prevValue + ", " + link.Replace("mailto:", "");
+                                    socialLinks["emails"] = prevValue + ", " + ProcessEmail(link);
                                 }
                             }
                             isMailFetch = true;
@@ -497,6 +498,42 @@ namespace WindowsFormsApp2
             }
 
             return emails;
+        }
+
+        string ExtractEmailFromDecodedValue(string decodedValue)
+        {
+            // Remove "mailto:" prefix
+            if (decodedValue.StartsWith("mailto:"))
+            {
+                decodedValue = decodedValue.Substring("mailto:".Length);
+            }
+
+            // Replace custom encoding (e.g., [at], [dot]) with actual characters
+            decodedValue = decodedValue.Replace("[at]", "@").Replace("[dot]", ".");
+
+            // Remove additional tags like <obs>, <obs_c>, etc.
+            decodedValue = Regex.Replace(decodedValue, @"<[^>]+>", "");
+
+            return decodedValue.Trim();
+        }
+
+        bool IsEncoded(string value)
+        {
+            // Check for URL-encoded characters using a regex pattern
+            return Regex.IsMatch(value, @"%[0-9A-Fa-f]{2}");
+        }
+
+        string ProcessEmail(string value)
+        {
+            // Check if the string contains URL-encoded characters
+            if (IsEncoded(value))
+            {
+                // Decode the value
+                value = HttpUtility.UrlDecode(value);
+            }
+
+            // Parse and clean the email
+            return ExtractEmailFromDecodedValue(value);
         }
 
 
