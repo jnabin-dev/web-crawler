@@ -304,7 +304,7 @@ namespace WindowsFormsApp2
             }
             cancellationTokenSource = new CancellationTokenSource();
             dataGridView.Rows.Clear();
-            UpdateProgress("", true);
+            //UpdateProgress("", true);
             results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)>();
             new Thread(async () => await StartCrawlingAsync(cancellationTokenSource.Token)).Start();
         }

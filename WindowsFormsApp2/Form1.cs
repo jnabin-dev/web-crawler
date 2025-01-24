@@ -14,11 +14,13 @@ using SeleniumExtras.WaitHelpers;
 using WebDriverManager.DriverConfigs.Impl;
 using WebDriverManager;
 using Keys = OpenQA.Selenium.Keys;
+using DocumentFormat.OpenXml.Spreadsheet;
 
 namespace WindowsFormsApp2
 {
     public partial class Form1 : Form
     {
+        List<string> dataColumns = new List<string>();
         private string[] searchTerms;
         private CancellationTokenSource cancellationTokenSource;
         List<string> chromeOptionArguements = new List<string> {
@@ -42,7 +44,7 @@ namespace WindowsFormsApp2
                     "a[href*='youtube.com']",
                     "a[href*='pinterest.com']"
                 };
-        private System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)> results;
+        private List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> results;
         public Form1()
         {
             InitializeComponent();
@@ -274,21 +276,12 @@ namespace WindowsFormsApp2
                             }
 
                             results.Add((term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue));
-                            Invoke(new Action(() =>
-                            {
-                                dataGridView.Rows.Add(
-                                    dataGridView.Rows.Count + 1,
-                                    term, title, category, location, streetLocation.Replace("·", ""), city, zip, country, contactNumber,
-                                    keyValuePairs.ContainsKey("emails") ? keyValuePairs["emails"] : string.Empty,
-                                    hrefValue,
-                                    keyValuePairs.ContainsKey("facebook") ? keyValuePairs["facebook"] : string.Empty,
-                                    keyValuePairs.ContainsKey("linkedin") ? keyValuePairs["linkedin"] : string.Empty,
-                                    keyValuePairs.ContainsKey("x") ? keyValuePairs["x"] : string.Empty,
-                                    keyValuePairs.ContainsKey("youtube") ? keyValuePairs["youtube"] : string.Empty,
-                                    keyValuePairs.ContainsKey("instagram") ? keyValuePairs["instagram"] : string.Empty,
-                                    keyValuePairs.ContainsKey("pinterest") ? keyValuePairs["pinterest"] : string.Empty,
-                                    rating, reviewCount);
 
+                           var rowToBeAdded = updateGridList(results[results.Count - 1]);
+                            Invoke(new Action(() =>
+
+                            {
+                                dataGridView.Rows.Add(rowToBeAdded);
                             }));
                             //driver.Navigate().Back();
                             //driver.Navigate().Back();
@@ -520,32 +513,97 @@ namespace WindowsFormsApp2
                 using (var workbook = new XLWorkbook())
                 {
                     var worksheet = workbook.Worksheets.Add("Results");
-                    for (int i = 1; i < SharedDataTableModel.DataGridColumns.Count; i++)
+                    for (int i = 1; i < SharedDataTableModel.SelectedFields.Count; i++)
                     {
                         worksheet.Cell(1, i).Value = SharedDataTableModel.SelectedFields[i].Name;
                     }
-
+                    List<String> sheetColumnsValue = new List<String>();
+                
                     for (int i = 0; i < results.Count; i++)
                     {
-                        worksheet.Cell(i + 2, 1).Value = results[i].SearchTerm;
-                        worksheet.Cell(i + 2, 2).Value = results[i].ResultTitle;
-                        worksheet.Cell(i + 2, 3).Value = results[i].Category;
-                        worksheet.Cell(i + 2, 4).Value = results[i].Address;
-                        worksheet.Cell(i + 2, 5).Value = results[i].streetAddress;
-                        worksheet.Cell(i + 2, 6).Value = results[i].city;
-                        worksheet.Cell(i + 2, 7).Value = results[i].zip;
-                        worksheet.Cell(i + 2, 8).Value = results[i].country;
-                        worksheet.Cell(i + 2, 9).Value = results[i].ContactNumber;
-                        worksheet.Cell(i + 2, 10).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
-                        worksheet.Cell(i + 2, 11).Value = results[i].hrefValue;
-                        worksheet.Cell(i + 2, 12).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
-                        worksheet.Cell(i + 2, 13).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
-                        worksheet.Cell(i + 2, 14).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
-                        worksheet.Cell(i + 2, 15).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
-                        worksheet.Cell(i + 2, 16).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
-                        worksheet.Cell(i + 2, 17).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
-                        worksheet.Cell(i + 2, 18).Value = results[i].ReviewCount;
-                        worksheet.Cell(i + 2, 19).Value = results[i].Rating;
+                        int columnIndex = 1;
+                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Keyword") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].SearchTerm;
+                            columnIndex++;
+                        }
+                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Name") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].ResultTitle;
+                            columnIndex++;
+                        }
+                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Category") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].Category;
+                            columnIndex++;
+                        } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Full_Address") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].Address;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Street_Address") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].streetAddress;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "City") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].city;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Zip") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].zip;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Country") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].country;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Contact Number") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].ContactNumber;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Email") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
+                            columnIndex++;
+                        }
+                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Website") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].hrefValue;
+                            columnIndex++;
+                        }
+                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Facebook") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Linkedin") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Twitter") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Youtube") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Instagram") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Pinterest") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
+                            columnIndex++;
+                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Rating") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].Rating;
+                            columnIndex++;
+                        }
+                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Review Count") != null)
+                        {
+                            worksheet.Cell(i + 2, columnIndex).Value = results[i].ReviewCount;
+                            columnIndex++;
+                        }
                     }
                     SaveFileDialog saveFileDialog = new SaveFileDialog();
                     // Set filter for Excel files
@@ -563,6 +621,95 @@ namespace WindowsFormsApp2
             {
                 MessageBox.Show($"Error exporting to Excel: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private Object[] updateGridList((string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite) result)
+        {
+            dataColumns = new List<string>();
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "#") != null)
+            {
+                dataColumns.Add((dataGridView.Rows.Count + 1).ToString());
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Keyword") != null)
+            {
+                dataColumns.Add(result.SearchTerm);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Name") != null)
+            {
+                dataColumns.Add(result.ResultTitle);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Category") != null)
+            {
+                dataColumns.Add(result.Category);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Full_Address") != null)
+            {
+                dataColumns.Add(result.Address);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Street_Address") != null)
+            {
+                dataColumns.Add(result.StreetAddress);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "City") != null)
+            {
+                dataColumns.Add(result.city);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Zip") != null)
+            {
+                dataColumns.Add(result.zip);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Country") != null)
+            {
+                dataColumns.Add(result.country);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Contact Number") != null)
+            {
+                dataColumns.Add(result.ContactNumber);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Email") != null)
+            {
+                dataColumns.Add(result.socialMedias.ContainsKey("emails") ? result.socialMedias["emails"] : string.Empty);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Website") != null)
+            {
+                dataColumns.Add(result.companyWebsite);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Facebook") != null)
+            {
+                dataColumns.Add(result.socialMedias.ContainsKey("facebook") ? result.socialMedias["facebook"] : string.Empty);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Linkedin") != null)
+            {
+                dataColumns.Add(result.socialMedias.ContainsKey("linkedin") ? result.socialMedias["linkedin"] : string.Empty);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Twitter") != null)
+            {
+                dataColumns.Add(result.socialMedias.ContainsKey("x") ? result.socialMedias["x"] : string.Empty);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Youtube") != null)
+            {
+                dataColumns.Add(result.socialMedias.ContainsKey("youtube") ? result.socialMedias["youtube"] : string.Empty);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Instagram") != null)
+            {
+                dataColumns.Add(result.socialMedias.ContainsKey("instagram") ? result.socialMedias["instagram"] : string.Empty);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Pinterest") != null)
+            {
+                dataColumns.Add(result.socialMedias.ContainsKey("pinterest") ? result.socialMedias["pinterest"] : string.Empty);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Rating") != null)
+            {
+                dataColumns.Add(result.Rating);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Review Count") != null)
+            {
+                dataColumns.Add(result.ReviewCount);
+            }
+
+            return dataColumns.ToArray();
+
+
         }
     }
 }
