@@ -513,12 +513,17 @@ namespace WindowsFormsApp2
                 using (var workbook = new XLWorkbook())
                 {
                     var worksheet = workbook.Worksheets.Add("Results");
-                    for (int i = 1; i < SharedDataTableModel.SelectedFields.Count; i++)
+                    int headerIndex = 1;
+                    for (headerIndex = 1; headerIndex < SharedDataTableModel.SelectedFields.Count; headerIndex++)
                     {
-                        worksheet.Cell(1, i).Value = SharedDataTableModel.SelectedFields[i].Name;
+                        worksheet.Cell(1, headerIndex).Value = SharedDataTableModel.SelectedFields[headerIndex].Name;
                     }
+                    worksheet.Cell(1, ++headerIndex).Value = "Date time";
                     List<String> sheetColumnsValue = new List<String>();
-                
+                    DateTime now = DateTime.Now;
+
+                    // Format it as "24 Jan 2025, hh:mm"
+                    string formattedDate = now.ToString("dd MMM yyyy, HH:mm");
                     for (int i = 0; i < results.Count; i++)
                     {
                         int columnIndex = 1;
@@ -604,6 +609,9 @@ namespace WindowsFormsApp2
                             worksheet.Cell(i + 2, columnIndex).Value = results[i].ReviewCount;
                             columnIndex++;
                         }
+                        worksheet.Cell(i + 2, columnIndex).Value = formattedDate;
+                        columnIndex++;
+
                     }
                     SaveFileDialog saveFileDialog = new SaveFileDialog();
                     // Set filter for Excel files
