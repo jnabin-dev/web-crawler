@@ -105,7 +105,7 @@ namespace WindowsFormsApp2
                     }
                 }
 
-                //driver.Quit();
+                driver.Quit();
 
                 // Export results to Excel
                 //ExportToExcel(results);
@@ -239,23 +239,32 @@ namespace WindowsFormsApp2
                             string city = string.Empty;
                             string zip = string.Empty;
                             string country = string.Empty;
+                            string location = string.Empty;
                             string streetLocation = string.Empty;
-                            var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
-                            string location = detailsElems[0].FindElement(By.CssSelector(".Io6YTe.fontBodyMedium.kR99db.fdkmkc")).Text;
                             string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
-                            var regex = new Regex(pattern);
-                            var match = regex.Match(location);
                             var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
-                            if (match.Success)
+                            var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
+                            try
                             {
-                                streetLocation = match.Groups["street"].Value;
-                                city = match.Groups["city"].Value;
-                                zip = match.Groups["zip"].Value;
-                                country = match.Groups["country"].Value;
+                                var item = detailsElems[0].FindElement(By.CssSelector("button[data-item-id='address'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc"));
+                                location = item != null ? item.Text : string.Empty;
+                                var regex = new Regex(pattern);
+                                var match = regex.Match(location);
+                                if (match.Success)
+                                {
+                                    streetLocation = match.Groups["street"].Value;
+                                    city = match.Groups["city"].Value;
+                                    zip = match.Groups["zip"].Value;
+                                    country = match.Groups["country"].Value;
+                                }
+                                else
+                                {
+                                    streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                }
                             }
-                            else
+                            catch (NoSuchElementException)
                             {
-                                streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                location = string.Empty;
                             }
                             //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
                             //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
