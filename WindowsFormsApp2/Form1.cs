@@ -77,7 +77,7 @@ namespace WindowsFormsApp2
             ExportToExcel(results);
         }
 
-        private async Task StartCrawlingAsync(CancellationToken cancellationToken)
+        private async Task StartCrawlingAsync(CancellationToken cancellationToken, bool fetchBusinessData)
         {
             try
             {
@@ -97,7 +97,7 @@ namespace WindowsFormsApp2
                     try
                     {
                         UpdateProgress($"Crawling: {term} - In progress");
-                        await processCrawlingAsync(driver, term, cancellationToken);
+                        await processCrawlingAsync(driver, term, cancellationToken, fetchBusinessData);
                         UpdateProgress($"Crawling: {term} - Completed");
                     } catch(Exception exc)
                     {
@@ -157,7 +157,7 @@ namespace WindowsFormsApp2
             }
         }
 
-        private async Task processCrawlingAsync(IWebDriver driver, string term, CancellationToken cancellationToken)
+        private async Task processCrawlingAsync(IWebDriver driver, string term, CancellationToken cancellationToken, bool fetchBusinessData)
         {
             var searchBox = driver.FindElement(By.Id("searchboxinput"));
             searchBox.Clear();
@@ -216,9 +216,10 @@ namespace WindowsFormsApp2
 
                             lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                             jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
+                            ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
                             clickableElement[i].Click();
                             i++;
-                            if (linkElement.Count > 0)
+                            if (fetchBusinessData && linkElement.Count > 0)
                             {
                                 hrefValue = linkElement[0].GetDomAttribute("href");
                                 var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
@@ -226,7 +227,7 @@ namespace WindowsFormsApp2
                             }
                             else
                             {
-                                Thread.Sleep(100);
+                                Thread.Sleep(200);
                             }
 
                             var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
@@ -302,7 +303,13 @@ namespace WindowsFormsApp2
                             // Skip if any element is missing
                         }
                     }
-                    Thread.Sleep(3000);
+                    if (!fetchBusinessData)
+                    {
+                        Thread.Sleep(2800);
+                    } else
+                    {
+                        Thread.Sleep(3000);
+                    }
                     //double lastHeight = Convert.ToDouble(((IJavaScriptExecutor)driver).ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                     int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                     var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
@@ -564,7 +571,7 @@ namespace WindowsFormsApp2
                     {
                         worksheet.Cell(1, headerIndex).Value = SharedDataTableModel.SelectedFields[headerIndex].Name;
                     }
-                    worksheet.Cell(1, ++headerIndex).Value = "Date time";
+                    worksheet.Cell(1, headerIndex).Value = "Date time";
                     List<String> sheetColumnsValue = new List<String>();
                     DateTime now = DateTime.Now;
 

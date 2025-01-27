@@ -306,7 +306,20 @@ namespace WindowsFormsApp2
             dataGridView.Rows.Clear();
             //UpdateProgress("", true);
             results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)>();
-            new Thread(async () => await StartCrawlingAsync(cancellationTokenSource.Token)).Start();
+            var confirmationForm = new ConfirmationForm();
+            var result = confirmationForm.ShowDialog();
+            if (result == DialogResult.OK && confirmationForm.UserConfirmed)
+            {
+                // User clicked "Yes"
+                new Thread(async () => await StartCrawlingAsync(cancellationTokenSource.Token, true)).Start();
+                // Start the crawler with additional features
+            }
+            else
+            {
+                // User clicked "No" or closed the dialog
+                new Thread(async () => await StartCrawlingAsync(cancellationTokenSource.Token, false)).Start();
+                // Start the crawler without additional features
+            }
         }
 
         // Menu Item Event Handlers
