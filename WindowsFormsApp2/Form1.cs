@@ -620,6 +620,11 @@ namespace WindowsFormsApp2
 
         private void ExportToExcel(List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string hrefValue)> results)
         {
+            if (results == null)
+            {
+                MessageBox.Show("There is no data no export.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             try
             {
                 var confirmationForm = new ConfirmationForm("Do you want to remove the duplicate data?");
