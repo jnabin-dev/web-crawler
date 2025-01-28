@@ -66,6 +66,11 @@ namespace WindowsFormsApp2
 
         private void stopCrawlButton_Click(object sender, EventArgs e)
         {
+            animatedLoader.Invoke(new Action(() =>
+            {
+                animatedLoader.Visible = false;
+            }));
+
             if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
             {
                 cancellationTokenSource.Cancel();
@@ -113,8 +118,11 @@ namespace WindowsFormsApp2
                         Console.WriteLine(exc.Message);
                     }
                 }
-
-                //driver.Quit();
+                animatedLoader.Invoke(new Action(() =>
+                {
+                    animatedLoader.Visible = false;
+                }));
+                driver.Quit();
 
                 // Export results to Excel
                 //ExportToExcel(results);
@@ -248,6 +256,7 @@ namespace WindowsFormsApp2
                                 results.Add(existingData);
                                 InsertRowIntoDatatable(existingData);
                                 hasUrl = false;
+                                Thread.Sleep(50);
                                 continue;
                             }
 

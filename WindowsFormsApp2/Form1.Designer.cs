@@ -32,6 +32,7 @@ namespace WindowsFormsApp2
         private ToolStripMenuItem advancedOptionsMenuItem;
         private ToolStripMenuItem checkForUpdatesMenuItem;
         private ToolStripMenuItem aboutMenuItem;
+        private PictureBox animatedLoader;
         //private ProgressBar progressBar;
         //private System.Windows.Forms.DataGridView dataGridView = new System.Windows.Forms.DataGridView();
         //private DataTable resultsDataTable = new DataTable();
@@ -163,6 +164,16 @@ namespace WindowsFormsApp2
             // 
             this.progressGroupBox.Text = "Progress";
             this.progressGroupBox.Controls.Add(this.progressTextBox);
+            string spinnerPath = Path.Combine(Application.StartupPath, "assets", "img", "spinner.gif");
+            animatedLoader = new PictureBox
+            {
+                Image = Image.FromFile(spinnerPath), // Path to your animated GIF
+                Location = new System.Drawing.Point(55, progressTextBox.Top-1), // Position beside the label
+                Size = new System.Drawing.Size(15, 15), // Adjust size as needed
+                SizeMode = PictureBoxSizeMode.StretchImage,
+                Visible = false // Initially hidden
+            };
+            progressGroupBox.Controls.Add(animatedLoader);
 
             // ProgressBar
             //progressBar = new ProgressBar
@@ -317,7 +328,6 @@ namespace WindowsFormsApp2
                 MessageBox.Show("Please upload a file with search terms first.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            UpdateProgress("Crawling started...");
             //progressBar.Visible = true;
             //InitializeDataTable();
             if (cancellationTokenSource != null)
@@ -330,6 +340,8 @@ namespace WindowsFormsApp2
             results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)>();
             var confirmationForm = new ConfirmationForm("Do you want to scrape email and other social media links from the business website? (It can slow down the crawler speed.)");
             var result = confirmationForm.ShowDialog();
+            animatedLoader.Visible = true;
+            UpdateProgress("Crawling started...");
             if (result == DialogResult.OK && confirmationForm.UserConfirmed)
             {
                 // User clicked "Yes"
