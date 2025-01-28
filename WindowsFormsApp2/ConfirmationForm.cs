@@ -12,9 +12,11 @@ namespace WindowsFormsApp2
 {
     public partial class ConfirmationForm : Form
     {
-        public ConfirmationForm()
+        private string ConfirmationText;
+        public ConfirmationForm(string confirmationText)
         {
-            InitializeComponent();
+            ConfirmationText = confirmationText;
+            InitializeComponent();    
         }
     }
 }

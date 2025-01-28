@@ -45,7 +45,7 @@ namespace WindowsFormsApp2
             // Label
             messageLabel = new Label
             {
-                Text = "Do you want to scrape email and other social media links from the business website? (It can slow down the crawler speed.)",
+                Text = ConfirmationText,
                 AutoSize = true,
                 Location = new System.Drawing.Point(10, 10),
                 MaximumSize = new System.Drawing.Size(300, 0), // Word wrap within 300px

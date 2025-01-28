@@ -14,6 +14,7 @@ namespace WindowsFormsApp2
         private Button btnUpload;
         private Button btnStart;
         private Button stopCrawlButton;
+        private Button clearButton;
         private Button exportButton;
         private GroupBox instructionsGroupBox;
         private GroupBox progressGroupBox;
@@ -31,6 +32,7 @@ namespace WindowsFormsApp2
         private ToolStripMenuItem advancedOptionsMenuItem;
         private ToolStripMenuItem checkForUpdatesMenuItem;
         private ToolStripMenuItem aboutMenuItem;
+        //private ProgressBar progressBar;
         //private System.Windows.Forms.DataGridView dataGridView = new System.Windows.Forms.DataGridView();
         //private DataTable resultsDataTable = new DataTable();
         /// <summary>
@@ -64,6 +66,7 @@ namespace WindowsFormsApp2
             this.btnStart = new Button();
             this.stopCrawlButton = new Button();
             this.exportButton = new Button();
+            this.clearButton = new Button();
             this.instructionsGroupBox = new GroupBox();
             this.progressGroupBox = new GroupBox();
             this.instructionsTextBox = new TextBox();
@@ -161,6 +164,16 @@ namespace WindowsFormsApp2
             this.progressGroupBox.Text = "Progress";
             this.progressGroupBox.Controls.Add(this.progressTextBox);
 
+            // ProgressBar
+            //progressBar = new ProgressBar
+            //{
+            //    Location = new System.Drawing.Point(progressTextBox.Right + 10, progressTextBox.Top), // Position beside the label
+            //    Size = new System.Drawing.Size(200, 20),
+            //    Style = ProgressBarStyle.Marquee, // Indeterminate progress style
+            //    Visible = false // Initially hidden
+            //};
+            //progressGroupBox.Controls.Add(progressBar);
+
             // 
             // progressTextBox
             // 
@@ -173,33 +186,40 @@ namespace WindowsFormsApp2
 
             this.btnUpload.Location = new System.Drawing.Point(10, 180); // Set position
             this.btnUpload.Name = "btnUpload";
-            this.btnUpload.Size = new System.Drawing.Size(150, 40); // Set size
+            this.btnUpload.Size = new System.Drawing.Size(100, 40); // Set size
             this.btnUpload.TabIndex = 0;
             this.btnUpload.Text = "Upload File";
             this.btnUpload.UseVisualStyleBackColor = true;
             this.btnUpload.Click += new System.EventHandler(this.btnUpload_Click);
 
-            this.btnStart.Location = new System.Drawing.Point(180, 180); // Set position
+            this.btnStart.Location = new System.Drawing.Point(130, 180); // Set position
             this.btnStart.Name = "btnStart";
-            this.btnStart.Size = new System.Drawing.Size(150, 40); // Set size
+            this.btnStart.Size = new System.Drawing.Size(100, 40); // Set size
             this.btnStart.TabIndex = 1;
             this.btnStart.Text = "Start Crawling";
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
 
-            this.stopCrawlButton.Location = new System.Drawing.Point(350, 180); // Adjust position
+            this.stopCrawlButton.Location = new System.Drawing.Point(250, 180); // Adjust position
             this.stopCrawlButton.Name = "stopCrawlButton";
             this.stopCrawlButton.Size = new System.Drawing.Size(100, 40); // Adjust size
             this.stopCrawlButton.Text = "Stop Crawl";
             this.stopCrawlButton.UseVisualStyleBackColor = true;
             this.stopCrawlButton.Click += new System.EventHandler(this.stopCrawlButton_Click);
             
-            this.exportButton.Location = new System.Drawing.Point(470, 180); // Adjust position
+            this.exportButton.Location = new System.Drawing.Point(370, 180); // Adjust position
             this.exportButton.Name = "exportDataButton";
             this.exportButton.Size = new System.Drawing.Size(100, 40); // Adjust size
             this.exportButton.Text = "Export";
             this.exportButton.UseVisualStyleBackColor = true;
             this.exportButton.Click += new System.EventHandler(this.exportDataButton_Click);
+            
+            this.clearButton.Location = new System.Drawing.Point(490, 180); // Adjust position
+            this.clearButton.Name = "clearDataButton";
+            this.clearButton.Size = new System.Drawing.Size(100, 40); // Adjust size
+            this.clearButton.Text = "Clear";
+            this.clearButton.UseVisualStyleBackColor = true;
+            this.clearButton.Click += new System.EventHandler(this.clearDataButton_Click);
 
             //Panel panel = new Panel
             //{
@@ -233,6 +253,7 @@ namespace WindowsFormsApp2
             this.Controls.Add(this.btnStart);
             this.Controls.Add(this.stopCrawlButton);
             this.Controls.Add(this.exportButton);
+            this.Controls.Add(this.clearButton);
             this.Controls.Add(this.dataGridView);
             this.Name = "MainForm";
             this.Text = "Codezzi Crawler";
@@ -297,6 +318,7 @@ namespace WindowsFormsApp2
                 return;
             }
             UpdateProgress("Crawling started...");
+            //progressBar.Visible = true;
             //InitializeDataTable();
             if (cancellationTokenSource != null)
             {
@@ -306,7 +328,7 @@ namespace WindowsFormsApp2
             dataGridView.Rows.Clear();
             //UpdateProgress("", true);
             results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)>();
-            var confirmationForm = new ConfirmationForm();
+            var confirmationForm = new ConfirmationForm("Do you want to scrape email and other social media links from the business website? (It can slow down the crawler speed.)");
             var result = confirmationForm.ShowDialog();
             if (result == DialogResult.OK && confirmationForm.UserConfirmed)
             {

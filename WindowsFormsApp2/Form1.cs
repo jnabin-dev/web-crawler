@@ -22,6 +22,7 @@ namespace WindowsFormsApp2
     public partial class Form1 : Form
     {
         List<string> dataColumns = new List<string>();
+        Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
         private string[] searchTerms;
         private CancellationTokenSource cancellationTokenSource;
         List<string> chromeOptionArguements = new List<string> {
@@ -69,6 +70,7 @@ namespace WindowsFormsApp2
             {
                 cancellationTokenSource.Cancel();
                 UpdateProgress("Stopping crawl...");
+                //progressBar.Visible = false;
             }
         }
 
@@ -76,11 +78,18 @@ namespace WindowsFormsApp2
         {
             ExportToExcel(results);
         }
+        
+        private void clearDataButton_Click(object sender, EventArgs e)
+        {
+            dataGridView.Rows.Clear();
+            UpdateProgress("", true);
+        }
 
         private async Task StartCrawlingAsync(CancellationToken cancellationToken, bool fetchBusinessData)
         {
             try
             {
+                uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
                 new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
                 ChromeOptions options = new ChromeOptions();
                 IWebDriver driver = new ChromeDriver(options);
@@ -105,11 +114,12 @@ namespace WindowsFormsApp2
                     }
                 }
 
-                driver.Quit();
+                //driver.Quit();
 
                 // Export results to Excel
                 //ExportToExcel(results);
                 UpdateProgress("Crawling finished.");
+                //progressBar.Visible = false;
             }
             catch (Exception ex)
             {
@@ -174,6 +184,7 @@ namespace WindowsFormsApp2
                 bool hasMoreResults = true;
                 IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
                 int lastHeight = 0;
+                bool hasUrl = true;
                 while (hasMoreResults)
                 {
                     if (cancellationToken.IsCancellationRequested)
@@ -219,17 +230,39 @@ namespace WindowsFormsApp2
                             ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
                             clickableElement[i].Click();
                             i++;
+                            string contactNumber = string.Empty;
+                            try
+                            {
+                                contactNumber = resultElement.FindElement(By.ClassName("UsdlK")).Text;
+                            }
+                            catch (Exception ex)
+                            {
+                            }
+                            UpdateProgress($"Record no: {(dataGridView.Rows.Count + 1).ToString()}");
+                            UpdateProgress($"Title: {title}");
+                            UpdateProgress($"------------------------");
+                            var existedData = uniqueDataPair.ContainsKey($"{title}_{contactNumber}");
+                            if (existedData)
+                            {
+                                var existingData = uniqueDataPair[$"{title}_{contactNumber}"];
+                                results.Add(existingData);
+                                InsertRowIntoDatatable(existingData);
+                                hasUrl = false;
+                                continue;
+                            }
+
                             if (fetchBusinessData && linkElement.Count > 0)
                             {
+                                hasUrl = true;
                                 hrefValue = linkElement[0].GetDomAttribute("href");
                                 var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, service));
                                 keyValuePairs = await task;
                             }
                             else
                             {
+                                hasUrl = false;
                                 Thread.Sleep(200);
                             }
-
                             var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
                             if (reviewListText != null && reviewListText.Count > 1)
                             {
@@ -277,23 +310,10 @@ namespace WindowsFormsApp2
                                     category = category.Split('·')[0];
                                 }
                             }
-                            string contactNumber = string.Empty;
-                            try
-                            {
-                                contactNumber = resultElement.FindElement(By.ClassName("UsdlK")).Text;
-                            }
-                            catch (Exception ex)
-                            {
-                            }
-
-                            results.Add((term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue));
-
-                           var rowToBeAdded = updateGridList(results[results.Count - 1]);
-                            Invoke(new Action(() =>
-
-                            {
-                                dataGridView.Rows.Add(rowToBeAdded);
-                            }));
+                            var dataTobeAdded = (term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue);
+                            results.Add(dataTobeAdded);
+                            uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
+                            InsertRowIntoDatatable(dataTobeAdded);
                             //driver.Navigate().Back();
                             //driver.Navigate().Back();
 
@@ -303,34 +323,28 @@ namespace WindowsFormsApp2
                             // Skip if any element is missing
                         }
                     }
-                    if (!fetchBusinessData)
+                    IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
+                    WebDriverWait scrollWait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+                    if (!IsEndOfScroll(driver))
                     {
-                        Thread.Sleep(2800);
+                        scrollWait.Until(driver2 =>
+                        {
+                            hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer, processedResults, jsExecutor);
+                            return hasMoreResults;
+                        });
                     } else
                     {
-                        Thread.Sleep(3000);
+                        hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer, processedResults, jsExecutor);
                     }
+                   
+                    //if (!fetchBusinessData || !hasUrl)
+                    //{
+                    //    Thread.Sleep(2800);
+                    //} else
+                    //{
+                    //    Thread.Sleep(1000);
+                    //}
                     //double lastHeight = Convert.ToDouble(((IJavaScriptExecutor)driver).ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                    int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                    var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-                    var t = newElements.Select(x =>
-                    {
-                        string txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
-                        if (!processedResults.Contains(txt))
-                        {
-                            return txt;
-                        }
-                        else
-                        {
-                            return string.Empty;
-                        }
-
-                    }).ToList();
-                    t = t.Where(x => x.Length > 0).ToList();
-                    if (t.Count == 0)
-                    {
-                        hasMoreResults = false;
-                    }
                     if (cancellationToken.IsCancellationRequested)
                     {
                         //lblStatus.Text = "Crawling stopped.";
@@ -343,6 +357,32 @@ namespace WindowsFormsApp2
             {
                 Console.WriteLine("Timeout waiting for search results to load.");
             }
+        }
+
+        private bool IsEndOfScroll(IWebDriver driver)
+        {
+            try
+            {
+                // Locate the specific div with classes "m6QErb XiKgde tLjsW eKbjU"
+                IWebElement endMessageContainer = driver.FindElement(By.CssSelector("div.m6QErb.XiKgde.tLjsW.eKbjU"));
+
+                // Check if it contains the "You've reached the end of the list." text
+                return endMessageContainer.Text.Contains("You've reached the end of the list.");
+            }
+            catch (NoSuchElementException)
+            {
+                return false; // Keep scrolling if the element is not found
+            }
+        }
+
+        private void InsertRowIntoDatatable((string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite) dataTobeAdded)
+        {
+            var rowToBeAdded = updateGridList(dataTobeAdded);
+            Invoke(new Action(() =>
+
+            {
+                dataGridView.Rows.Add(rowToBeAdded);
+            }));
         }
 
         private List<string> GetRatingReview(string input)
@@ -554,15 +594,38 @@ namespace WindowsFormsApp2
 
 
 
-        private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer)
+        private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer, HashSet<string> processedResults, IJavaScriptExecutor jsExecutor)
         {
-            return false;
+            bool hasMoreResults = true;
+            int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+            var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
+            List<string> t = newElements.Select(x =>
+            {
+                string txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
+                if (!processedResults.Contains(txt))
+                {
+                    return txt;
+                }
+                else
+                {
+                    return string.Empty;
+                }
+
+            }).ToList();
+            t = t.Where(x => x.Length > 0).ToList();
+            hasMoreResults = t.Count != 0;
+
+            return hasMoreResults;
         }
 
         private void ExportToExcel(List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string hrefValue)> results)
         {
             try
             {
+                var confirmationForm = new ConfirmationForm("Do you want to remove the duplicate data?");
+                var result = confirmationForm.ShowDialog();
+                bool removeDuplicate = result == DialogResult.OK && confirmationForm.UserConfirmed;
+                List<(string ResultTitle, string Address, string ContactNumber)> duplicateDataFlag = new List<(string ResultTitle, string Address, string ContactNumber)>();
                 using (var workbook = new XLWorkbook())
                 {
                     var worksheet = workbook.Worksheets.Add("Results");
@@ -579,6 +642,20 @@ namespace WindowsFormsApp2
                     string formattedDate = now.ToString("dd MMM yyyy, HH:mm");
                     for (int i = 0; i < results.Count; i++)
                     {
+                        if (removeDuplicate)
+                        {
+                            var hasDuplicate = duplicateDataFlag.Any(x =>
+                                x.ResultTitle.ToLower() == results[i].ResultTitle.ToLower() &&
+                                x.ContactNumber.ToLower() == results[i].ContactNumber.ToLower() &&
+                                x.Address.ToLower() == results[i].Address.ToLower()
+                            );
+                            if (hasDuplicate)
+                            {
+                                continue;
+                            }
+                            duplicateDataFlag.Add((results[i].ResultTitle, results[i].Address, results[i].ContactNumber));
+                        }
+
                         int columnIndex = 1;
                         if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Keyword") != null)
                         {
