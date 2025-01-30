@@ -16,14 +16,20 @@ using WebDriverManager;
 using Keys = OpenQA.Selenium.Keys;
 using DocumentFormat.OpenXml.Spreadsheet;
 using System.Web;
+using System.Linq.Expressions;
+using System.Drawing;
+using System.IO;
+using System.CodeDom.Compiler;
 
 namespace WindowsFormsApp2
 {
     public partial class Form1 : Form
     {
         List<string> dataColumns = new List<string>();
-        Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
+        //Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
         private string[] searchTerms;
+        private List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> tempRows = new List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
+        private int batchSize = 35;
         private CancellationTokenSource cancellationTokenSource;
         List<string> chromeOptionArguements = new List<string> {
             "--headless",
@@ -52,6 +58,8 @@ namespace WindowsFormsApp2
             InitializeComponent();
             this.StartPosition = FormStartPosition.CenterScreen;
             this.ResizeEnd += Form1_Resize;
+            string iconPath = Path.Combine(Application.StartupPath, "assets", "icon", "app-icon.ico");
+            this.Icon = new Icon(iconPath);
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -94,19 +102,30 @@ namespace WindowsFormsApp2
         {
             try
             {
-                uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
+                //uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
                 new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
                 ChromeOptions options = new ChromeOptions();
                 IWebDriver driver = new ChromeDriver(options);
                 driver.Manage().Window.Maximize();
                 IWebDriver chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
                 driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                int count = 0;
                 foreach (string term in searchTerms)
                 {
+                    count++;
                     if (cancellationToken.IsCancellationRequested)
                     {
                         //lblStatus.Text = "Crawling stopped.";
                         break;
+                    }
+                    if (count > 5)
+                    {
+                        count = 0;
+                        driver.Quit();
+                        driver = new ChromeDriver(options);
+                        driver.Manage().Window.Maximize();
+                        driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                        continue;
                     }
                     try
                     {
@@ -116,6 +135,7 @@ namespace WindowsFormsApp2
                     } catch(Exception exc)
                     {
                         Console.WriteLine(exc.Message);
+                        UpdateProgress(exc.Message);
                     }
                 }
                 animatedLoader.Invoke(new Action(() =>
@@ -244,33 +264,46 @@ namespace WindowsFormsApp2
                             }
                             catch (Exception ex)
                             {
+                                UpdateProgress(ex.Message);
                             }
-                            UpdateProgress($"Record no: {(dataGridView.Rows.Count + 1).ToString()}");
+                            UpdateProgress($"Record no: {(results.Count + 1).ToString()}");
                             UpdateProgress($"Title: {title}");
                             UpdateProgress($"------------------------");
-                            var existedData = uniqueDataPair.ContainsKey($"{title}_{contactNumber}");
-                            if (existedData)
+                            //var existedData = uniqueDataPair.ContainsKey($"{title}_{contactNumber}");
+                            //if (existedData)
+                            //{
+                            //    var existingData = uniqueDataPair[$"{title}_{contactNumber}"];
+                            //    results.Add(existingData);
+                            //    InsertRowIntoDatatable(existingData);
+                            //    hasUrl = false;
+                            //    Thread.Sleep(50);
+                            //    continue;
+                            //}
+                            try{
+                                if (fetchBusinessData && linkElement.Count > 0)
+                                {
+                                    hasUrl = true;
+                                    hrefValue = linkElement[0].GetDomAttribute("href");
+                                    if (batchSize == 0)
+                                    {
+                                        webDriver = GetChromeDriverForBusinessDataFetch();
+                                        batchSize = 35;
+                                    }
+                                    var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, webDriver));
+                                    keyValuePairs = await task;
+                                }
+                                else
+                                {
+                                    hasUrl = false;
+                                    Thread.Sleep(200);
+                                }
+                            } catch (Exception ex)
                             {
-                                var existingData = uniqueDataPair[$"{title}_{contactNumber}"];
-                                results.Add(existingData);
-                                InsertRowIntoDatatable(existingData);
-                                hasUrl = false;
-                                Thread.Sleep(50);
-                                continue;
-                            }
-
-                            if (fetchBusinessData && linkElement.Count > 0)
-                            {
-                                hasUrl = true;
-                                hrefValue = linkElement[0].GetDomAttribute("href");
-                                var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, webDriver));
-                                keyValuePairs = await task;
-                            }
-                            else
-                            {
+                                UpdateProgress(ex.Message);
                                 hasUrl = false;
                                 Thread.Sleep(200);
                             }
+
                             var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
                             if (reviewListText != null && reviewListText.Count > 1)
                             {
@@ -304,8 +337,9 @@ namespace WindowsFormsApp2
                                     streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
                                 }
                             }
-                            catch (NoSuchElementException)
+                            catch (Exception ex)
                             {
+                                UpdateProgress(ex.Message);
                                 location = string.Empty;
                             }
                             //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
@@ -320,7 +354,7 @@ namespace WindowsFormsApp2
                             }
                             var dataTobeAdded = (term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue);
                             results.Add(dataTobeAdded);
-                            uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
+                            //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
                             InsertRowIntoDatatable(dataTobeAdded);
                             //driver.Navigate().Back();
                             //driver.Navigate().Back();
@@ -328,10 +362,11 @@ namespace WindowsFormsApp2
                         }
                         catch (Exception ex)
                         {
+                            UpdateProgress($"{ex.StackTrace}");
                             // Skip if any element is missing
                         }
                     }
-                    IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
+                    //IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
                     WebDriverWait scrollWait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
                     if (!IsEndOfScroll(driver))
                     {
@@ -361,9 +396,10 @@ namespace WindowsFormsApp2
                     }
                 }
             }
-            catch (WebDriverTimeoutException)
+            catch (Exception ex)
             {
                 Console.WriteLine("Timeout waiting for search results to load.");
+                UpdateProgress(ex.Message);
             }
         }
 
@@ -377,20 +413,27 @@ namespace WindowsFormsApp2
                 // Check if it contains the "You've reached the end of the list." text
                 return endMessageContainer.Text.Contains("You've reached the end of the list.");
             }
-            catch (NoSuchElementException)
+            catch (Exception ex)
             {
                 return false; // Keep scrolling if the element is not found
             }
         }
-
         private void InsertRowIntoDatatable((string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite) dataTobeAdded)
         {
-            var rowToBeAdded = updateGridList(dataTobeAdded);
-            Invoke(new Action(() =>
-
+            tempRows.Add(dataTobeAdded);
+            if(tempRows.Count >= 10 || dataGridView.RowCount == 0)
             {
-                dataGridView.Rows.Add(rowToBeAdded);
-            }));
+                Invoke(new Action(() =>
+
+                {
+                    foreach (var r in tempRows)
+                    {
+                        var rowToBeAdded = updateGridList(r);
+                        dataGridView.Rows.Add(rowToBeAdded);
+                    }
+                    tempRows.Clear(); // Clear buffer after batch update
+                }));
+            }
         }
 
         private List<string> GetRatingReview(string input)
@@ -448,15 +491,22 @@ namespace WindowsFormsApp2
             var socialLinks = new Dictionary<string, string>();
             if (businessUrl == null || businessUrl.Length == 0) { return socialLinks; }
             // Launch a new browser (this could be in a separate ChromeDriver instance)
-            
-            ((ChromeDriver)driver).ExecuteCdpCommand("Network.setBlockedURLs", new Dictionary<string, object>
+            try
+            {
+                ((ChromeDriver)driver).ExecuteCdpCommand("Network.setBlockedURLs", new Dictionary<string, object>
             {
                 { "urls", new[] { "*.jpg", "*.png", "*.gif", "*.css", "*.woff", "*.mp4", "*.svg" } }
             });
+            }
+            catch (ObjectDisposedException)
+            {
+                driver = GetChromeDriverForBusinessDataFetch();
+                batchSize = 35;
+            }
             try
             {
                 driver.Navigate().GoToUrl(businessUrl);
-
+                batchSize -= 1;
                 // Fetch social media links from the business website (e.g., from footer or social media icons)
                 bool isMailFetch = false;
                 foreach (var selector in socialMediaSelectors)
@@ -526,10 +576,14 @@ namespace WindowsFormsApp2
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching social media links for {businessUrl}: {ex.Message}");
+                UpdateProgress($"Error fetching social media links for {businessUrl}: {ex.Message}");
             }
             finally
             {
-                //driver.Quit();
+                if(batchSize == 0)
+                {
+                    driver.Quit();
+                }
             }
 
             return socialLinks;
@@ -613,6 +667,7 @@ namespace WindowsFormsApp2
 
         private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer, HashSet<string> processedResults, IJavaScriptExecutor jsExecutor)
         {
+            //ValidateDriverSession(driver, jsExecutor);
             bool hasMoreResults = true;
             int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
             var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
@@ -634,6 +689,40 @@ namespace WindowsFormsApp2
 
             return hasMoreResults;
         }
+
+        private void ValidateDriverSession(IWebDriver driver, IJavaScriptExecutor jsExecutor)
+        {
+            try
+            {
+                if (driver == null)
+                {
+                    Console.WriteLine("Driver is null. Restarting...");
+                    ChromeOptions options = new ChromeOptions();
+                    driver = new ChromeDriver(options);
+                    driver.Manage().Window.Maximize();
+                    jsExecutor = (IJavaScriptExecutor)driver;
+                }
+
+                if (string.IsNullOrEmpty(driver.CurrentWindowHandle)) // Check if window is still open
+                {
+                    Console.WriteLine("Driver session is invalid. Restarting...");
+                    ChromeOptions options = new ChromeOptions();
+                    driver = new ChromeDriver(options);
+                    driver.Manage().Window.Maximize();
+                    jsExecutor = (IJavaScriptExecutor)driver;
+                }
+
+            }
+            catch (WebDriverException)
+            {
+                Console.WriteLine("Driver session is invalid. Restarting...");
+                ChromeOptions options = new ChromeOptions();
+                driver = new ChromeDriver(options);
+                driver.Manage().Window.Maximize();
+                jsExecutor = (IJavaScriptExecutor)driver;
+            }
+        }
+
 
         private void ExportToExcel(List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string hrefValue)> results)
         {

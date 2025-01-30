@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.IO;
@@ -267,7 +268,7 @@ namespace WindowsFormsApp2
             this.Controls.Add(this.clearButton);
             this.Controls.Add(this.dataGridView);
             this.Name = "MainForm";
-            this.Text = "Codezzi Crawler";
+            this.Text = "Sky Crawler";
             //((System.ComponentModel.ISupportInitialize)(this.dataGridView)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();

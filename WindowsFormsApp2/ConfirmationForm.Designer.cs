@@ -39,7 +39,7 @@ namespace WindowsFormsApp2
         {
             this.components = new System.ComponentModel.Container();
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
+            //this.ClientSize = new System.Drawing.Size(800, 450);
             this.Text = "ConfirmationForm";
 
             // Label
@@ -55,7 +55,7 @@ namespace WindowsFormsApp2
             yesButton = new Button
             {
                 Text = "Yes",
-                Location = new System.Drawing.Point(10, messageLabel.Bottom + 40),
+                Location = new System.Drawing.Point(10, 50),
                 Size = new System.Drawing.Size(75, 30)
             };
             yesButton.Click += YesButton_Click;
@@ -64,7 +64,7 @@ namespace WindowsFormsApp2
             noButton = new Button
             {
                 Text = "No",
-                Location = new System.Drawing.Point(110, messageLabel.Bottom + 40),
+                Location = new System.Drawing.Point(110, 50),
                 Size = new System.Drawing.Size(75, 30)
             };
             noButton.Click += NoButton_Click;
