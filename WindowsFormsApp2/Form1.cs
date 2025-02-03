@@ -105,6 +105,12 @@ namespace WindowsFormsApp2
                 //uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
                 new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
                 ChromeOptions options = new ChromeOptions();
+                //options.AddArgument("--disable-software-rasterizer");
+                options.AddArgument("--disable-gpu");  // Disables GPU acceleration
+                options.AddArgument("--disable-software-rasterizer"); // Prevents GPU fallback
+                options.AddArgument("--no-sandbox");  // Helps in some environments
+                options.AddArgument("--disable-dev-shm-usage"); // Prevents shared memory issues
+                options.AddArgument("--disable-accelerated-2d-canvas"); // Avoids rendering crashes
                 IWebDriver driver = new ChromeDriver(options);
                 driver.Manage().Window.Maximize();
                 IWebDriver chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
@@ -118,10 +124,19 @@ namespace WindowsFormsApp2
                         //lblStatus.Text = "Crawling stopped.";
                         break;
                     }
-                    if (count > 5)
+                    if (count > 10)
                     {
                         count = 0;
                         driver.Quit();
+                        driver.Dispose();
+                        driver = null;
+                        options = new ChromeOptions();
+                        //options.AddArgument("--disable-software-rasterizer");
+                        options.AddArgument("--disable-gpu");  // Disables GPU acceleration
+                        options.AddArgument("--disable-software-rasterizer"); // Prevents GPU fallback
+                        options.AddArgument("--no-sandbox");  // Helps in some environments
+                        options.AddArgument("--disable-dev-shm-usage"); // Prevents shared memory issues
+                        options.AddArgument("--disable-accelerated-2d-canvas"); // Avoids rendering crashes
                         driver = new ChromeDriver(options);
                         driver.Manage().Window.Maximize();
                         driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
@@ -143,7 +158,11 @@ namespace WindowsFormsApp2
                     animatedLoader.Visible = false;
                 }));
                 driver.Quit();
+                driver.Dispose();
+                driver = null;
                 chromeDriverForBusinessData.Quit();
+                chromeDriverForBusinessData.Dispose();
+                chromeDriverForBusinessData = null;
                 // Export results to Excel
                 //ExportToExcel(results);
                 UpdateProgress("Crawling finished.");
@@ -152,7 +171,7 @@ namespace WindowsFormsApp2
             catch (Exception ex)
             {
                 MessageBox.Show($"Error during crawling: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                UpdateProgress("Error occurred.");
+                UpdateProgress("Error occurred." + "-155");
             }
         }
 
@@ -202,7 +221,7 @@ namespace WindowsFormsApp2
             searchBox.SendKeys(term);
             searchBox.SendKeys(Keys.Enter);
             // Wait for the search box to load
-            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(20));
             try
             {
                 // Example: Wait for the search results container to be visible
@@ -264,7 +283,7 @@ namespace WindowsFormsApp2
                             }
                             catch (Exception ex)
                             {
-                                UpdateProgress(ex.Message);
+                                UpdateProgress(ex.Message + "-267");
                             }
                             UpdateProgress($"Record no: {(results.Count + 1).ToString()}");
                             UpdateProgress($"Title: {title}");
@@ -284,11 +303,14 @@ namespace WindowsFormsApp2
                                 {
                                     hasUrl = true;
                                     hrefValue = linkElement[0].GetDomAttribute("href");
-                                    if (batchSize == 0)
-                                    {
-                                        webDriver = GetChromeDriverForBusinessDataFetch();
-                                        batchSize = 35;
-                                    }
+                                    //if (batchSize == 0)
+                                    //{
+                                    //    webDriver.Quit();
+                                    //    webDriver.Dispose();
+                                    //    webDriver = GetChromeDriverForBusinessDataFetch();
+                                    //    batchSize = 35;
+                                    //}
+                                    //UpdateProgress("going to call setchsocialMediaLinks");
                                     var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, webDriver));
                                     keyValuePairs = await task;
                                 }
@@ -299,11 +321,11 @@ namespace WindowsFormsApp2
                                 }
                             } catch (Exception ex)
                             {
-                                UpdateProgress(ex.Message);
+                                UpdateProgress(ex.Message+"-303");
                                 hasUrl = false;
                                 Thread.Sleep(200);
                             }
-
+                            //UpdateProgress("Processing other data after links");
                             var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
                             if (reviewListText != null && reviewListText.Count > 1)
                             {
@@ -339,7 +361,7 @@ namespace WindowsFormsApp2
                             }
                             catch (Exception ex)
                             {
-                                UpdateProgress(ex.Message);
+                                UpdateProgress(ex.Message + "-343");
                                 location = string.Empty;
                             }
                             //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
@@ -356,13 +378,15 @@ namespace WindowsFormsApp2
                             results.Add(dataTobeAdded);
                             //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
                             InsertRowIntoDatatable(dataTobeAdded);
+                            //UpdateProgress("data extract finished"+" -360");
                             //driver.Navigate().Back();
                             //driver.Navigate().Back();
 
                         }
                         catch (Exception ex)
                         {
-                            UpdateProgress($"{ex.StackTrace}");
+                            UpdateProgress($"{ex.StackTrace}" + "-366");
+                            UpdateProgress($"{ex.Message}" + "-367");
                             // Skip if any element is missing
                         }
                     }
@@ -399,7 +423,7 @@ namespace WindowsFormsApp2
             catch (Exception ex)
             {
                 Console.WriteLine("Timeout waiting for search results to load.");
-                UpdateProgress(ex.Message);
+                UpdateProgress(ex.StackTrace +  ex.Message + "-403");
             }
         }
 
@@ -481,7 +505,7 @@ namespace WindowsFormsApp2
             options.AddUserProfilePreference("profile.managed_default_content_settings.javascript", 2);  // Block fonts
 
             var driver = new ChromeDriver(service, options);
-            driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(30);
+            driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(10);
 
             return driver;
         }
@@ -500,12 +524,16 @@ namespace WindowsFormsApp2
             }
             catch (ObjectDisposedException)
             {
-                driver = GetChromeDriverForBusinessDataFetch();
-                batchSize = 35;
+                //driver.Quit();
+                //driver.Dispose();
+                //driver = GetChromeDriverForBusinessDataFetch();
+                //batchSize = 35;
             }
             try
             {
+                //UpdateProgress("driver initialize finished");
                 driver.Navigate().GoToUrl(businessUrl);
+                //UpdateProgress("web visit finished");
                 batchSize -= 1;
                 // Fetch social media links from the business website (e.g., from footer or social media icons)
                 bool isMailFetch = false;
@@ -559,33 +587,36 @@ namespace WindowsFormsApp2
                 }
                 if (!isMailFetch)
                 {
-                    var emails = FetchEmails(driver);
+                    //var emails = FetchEmails(driver);
 
-                    // Combine all emails into one string (comma-separated)
-                    if (emails.Count > 0)
-                    {
-                        string combinedEmails = string.Join(", ", emails);
-                        socialLinks["emails"] = combinedEmails; // Single key for all emails
-                    }
-                    else
-                    {
-                        socialLinks["emails"] = string.Empty;
-                    }
+                    //// Combine all emails into one string (comma-separated)
+                    //if (emails.Count > 0)
+                    //{
+                    //    string combinedEmails = string.Join(", ", emails);
+                    //    socialLinks["emails"] = combinedEmails; // Single key for all emails
+                    //}
+                    //else
+                    //{
+                    //    socialLinks["emails"] = string.Empty;
+                    //}
+                    socialLinks["emails"] = string.Empty;
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching social media links for {businessUrl}: {ex.Message}");
-                UpdateProgress($"Error fetching social media links for {businessUrl}: {ex.Message}");
+                //UpdateProgress($"Error fetching social media links for {businessUrl}: {ex.Message}" + "-583");
             }
             finally
             {
-                if(batchSize == 0)
-                {
-                    driver.Quit();
-                }
+                //if(batchSize == 0)
+                //{
+                //    driver.Quit();
+                //    driver.Dispose();
+                //    driver = null;
+                //}
             }
-
+            //UpdateProgress("returning links");
             return socialLinks;
         }
 
