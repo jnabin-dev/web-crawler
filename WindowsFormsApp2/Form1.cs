@@ -20,6 +20,7 @@ using System.Linq.Expressions;
 using System.Drawing;
 using System.IO;
 using System.CodeDom.Compiler;
+using OpenQA.Selenium.Remote;
 
 namespace WindowsFormsApp2
 {
@@ -41,6 +42,10 @@ namespace WindowsFormsApp2
             "--disable-popup-blocking",
             "--enable-features=NetworkService,NetworkServiceInProcess",
             "--enable-async-dns",
+           "--disable-site-isolation-trials",
+           "--renderer-process-limit=5",
+           "--incognito",
+            "--disable-extensions",
             "--reduce-security-for-testing" };
         List<string> socialMediaSelectors = new List<string>
                 {
@@ -56,6 +61,7 @@ namespace WindowsFormsApp2
         public Form1()
         {
             InitializeComponent();
+            LoggerService.Info("Sky Crawler Application Started.");
             this.StartPosition = FormStartPosition.CenterScreen;
             this.ResizeEnd += Form1_Resize;
             string iconPath = Path.Combine(Application.StartupPath, "assets", "icon", "app-icon.ico");
@@ -72,19 +78,28 @@ namespace WindowsFormsApp2
             AdjustDataGridViewHeight();
         }
 
+        void manageStartButton(bool isEnable)
+        {
+            btnStart.Invoke(new Action(() =>
+            {
+                btnStart.Enabled = isEnable;
+            }));
+        }
+
         private void stopCrawlButton_Click(object sender, EventArgs e)
         {
             animatedLoader.Invoke(new Action(() =>
             {
                 animatedLoader.Visible = false;
             }));
-
             if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
             {
                 cancellationTokenSource.Cancel();
                 UpdateProgress("Stopping crawl...");
+                LoggerService.Warning("Crawling process was manually stopped.");
                 //progressBar.Visible = false;
             }
+            manageStartButton(true);
         }
 
         private void exportDataButton_Click(object sender, EventArgs e)
@@ -95,7 +110,27 @@ namespace WindowsFormsApp2
         private void clearDataButton_Click(object sender, EventArgs e)
         {
             dataGridView.Rows.Clear();
+            LoggerService.Info("Clearing data.");
             UpdateProgress("", true);
+        }
+
+        private IWebDriver RestartPrimaryWebDriver()
+        {
+            ChromeOptions options = new ChromeOptions();
+            //options.AddArgument("--disable-software-rasterizer");
+            options.AddArgument("--disable-gpu");  // Disables GPU acceleration
+            options.AddArgument("--incognito");  // Disables GPU acceleration
+            options.AddArgument("--disable-site-isolation-trials");
+            options.AddArgument("--renderer-process-limit=5"); // Limit Chrome to 5 processes
+            options.AddArgument("--disable-extensions"); // Prevents loading unnecessary extensions
+            options.AddArgument("--disable-software-rasterizer"); // Prevents GPU fallback
+            options.AddArgument("--no-sandbox");  // Helps in some environments
+            options.AddArgument("--disable-dev-shm-usage"); // Prevents shared memory issues
+            options.AddArgument("--disable-accelerated-2d-canvas"); // Avoids rendering crashes
+            IWebDriver driver = new ChromeDriver(options);
+            driver.Manage().Window.Maximize();
+
+            return driver;
         }
 
         private async Task StartCrawlingAsync(CancellationToken cancellationToken, bool fetchBusinessData)
@@ -104,42 +139,39 @@ namespace WindowsFormsApp2
             {
                 //uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
                 new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
-                ChromeOptions options = new ChromeOptions();
-                //options.AddArgument("--disable-software-rasterizer");
-                options.AddArgument("--disable-gpu");  // Disables GPU acceleration
-                options.AddArgument("--disable-software-rasterizer"); // Prevents GPU fallback
-                options.AddArgument("--no-sandbox");  // Helps in some environments
-                options.AddArgument("--disable-dev-shm-usage"); // Prevents shared memory issues
-                options.AddArgument("--disable-accelerated-2d-canvas"); // Avoids rendering crashes
-                IWebDriver driver = new ChromeDriver(options);
-                driver.Manage().Window.Maximize();
+                IWebDriver driver = RestartPrimaryWebDriver();
                 IWebDriver chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
                 driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
                 int count = 0;
                 foreach (string term in searchTerms)
                 {
+                    LoggerService.Info(term);
                     count++;
                     if (cancellationToken.IsCancellationRequested)
                     {
                         //lblStatus.Text = "Crawling stopped.";
                         break;
                     }
-                    if (count > 10)
+                    if (count > 100)
                     {
                         count = 0;
                         driver.Quit();
                         driver.Dispose();
                         driver = null;
-                        options = new ChromeOptions();
-                        //options.AddArgument("--disable-software-rasterizer");
-                        options.AddArgument("--disable-gpu");  // Disables GPU acceleration
-                        options.AddArgument("--disable-software-rasterizer"); // Prevents GPU fallback
-                        options.AddArgument("--no-sandbox");  // Helps in some environments
-                        options.AddArgument("--disable-dev-shm-usage"); // Prevents shared memory issues
-                        options.AddArgument("--disable-accelerated-2d-canvas"); // Avoids rendering crashes
-                        driver = new ChromeDriver(options);
-                        driver.Manage().Window.Maximize();
-                        driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                        LoggerService.Info("Driver closed.");
+                        LoggerService.Info("New driver creating for primary data, 167");
+                        driver = RestartPrimaryWebDriver();
+                        if (IsSessionActive(driver))
+                        {
+                            driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                        } else
+                        {
+                            LoggerService.Info("New driver creating for primary data, 169");
+                            driver = GetChromeDriverForBusinessDataFetch();
+                            driver = RestartPrimaryWebDriver();
+                            Thread.Sleep(30);
+                            driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                        }
                         continue;
                     }
                     try
@@ -150,7 +182,8 @@ namespace WindowsFormsApp2
                     } catch(Exception exc)
                     {
                         Console.WriteLine(exc.Message);
-                        UpdateProgress(exc.Message);
+                        LoggerService.Error("Crawling error - 174", exc);
+                        //UpdateProgress(exc.Message);
                     }
                 }
                 animatedLoader.Invoke(new Action(() =>
@@ -166,12 +199,15 @@ namespace WindowsFormsApp2
                 // Export results to Excel
                 //ExportToExcel(results);
                 UpdateProgress("Crawling finished.");
+                LoggerService.Info("Crawling Completed Successfully.");
+                manageStartButton(true);
                 //progressBar.Visible = false;
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error during crawling: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                UpdateProgress("Error occurred." + "-155");
+                //UpdateProgress("Error occurred." + "-155");
+                LoggerService.Error("Crawling error - 199", ex);
             }
         }
 
@@ -283,7 +319,8 @@ namespace WindowsFormsApp2
                             }
                             catch (Exception ex)
                             {
-                                UpdateProgress(ex.Message + "-267");
+                                //UpdateProgress(ex.Message + "-267");
+                                LoggerService.Error("Crawling error - 312", ex);
                             }
                             UpdateProgress($"Record no: {(results.Count + 1).ToString()}");
                             UpdateProgress($"Title: {title}");
@@ -321,7 +358,8 @@ namespace WindowsFormsApp2
                                 }
                             } catch (Exception ex)
                             {
-                                UpdateProgress(ex.Message+"-303");
+                                //UpdateProgress(ex.Message+"-303");
+                                LoggerService.Error("business data fetch error - 351", ex);
                                 hasUrl = false;
                                 Thread.Sleep(200);
                             }
@@ -361,7 +399,8 @@ namespace WindowsFormsApp2
                             }
                             catch (Exception ex)
                             {
-                                UpdateProgress(ex.Message + "-343");
+                                //UpdateProgress(ex.Message + "-343");
+                                LoggerService.Error("Crawling error - 392", ex);
                                 location = string.Empty;
                             }
                             //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
@@ -385,8 +424,9 @@ namespace WindowsFormsApp2
                         }
                         catch (Exception ex)
                         {
-                            UpdateProgress($"{ex.StackTrace}" + "-366");
-                            UpdateProgress($"{ex.Message}" + "-367");
+                            //UpdateProgress($"{ex.StackTrace}" + "-366");
+                            //UpdateProgress($"{ex.Message}" + "-367");
+                            LoggerService.Error("Crawling error - 418", ex);
                             // Skip if any element is missing
                         }
                     }
@@ -423,8 +463,15 @@ namespace WindowsFormsApp2
             catch (Exception ex)
             {
                 Console.WriteLine("Timeout waiting for search results to load.");
-                UpdateProgress(ex.StackTrace +  ex.Message + "-403");
+                //UpdateProgress(ex.StackTrace +  ex.Message + "-403");
+                LoggerService.Error("Crawling error - 456", ex);
             }
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            LoggerService.Info("Sky Crawler Application Closed.");
+            LoggerService.Close();
         }
 
         private bool IsEndOfScroll(IWebDriver driver)
@@ -439,6 +486,7 @@ namespace WindowsFormsApp2
             }
             catch (Exception ex)
             {
+                LoggerService.Error("Crawling error - 478", ex);
                 return false; // Keep scrolling if the element is not found
             }
         }
@@ -522,8 +570,9 @@ namespace WindowsFormsApp2
                 { "urls", new[] { "*.jpg", "*.png", "*.gif", "*.css", "*.woff", "*.mp4", "*.svg" } }
             });
             }
-            catch (ObjectDisposedException)
+            catch (ObjectDisposedException ex)
             {
+                LoggerService.Error("Crawling error - 564", ex);
                 //driver.Quit();
                 //driver.Dispose();
                 //driver = GetChromeDriverForBusinessDataFetch();
@@ -532,7 +581,16 @@ namespace WindowsFormsApp2
             try
             {
                 //UpdateProgress("driver initialize finished");
-                driver.Navigate().GoToUrl(businessUrl);
+                if (IsSessionActive(driver))
+                {
+                    driver.Navigate().GoToUrl(businessUrl);
+                } else
+                {
+                    LoggerService.Info("New driver creating for business data");
+                    driver = GetChromeDriverForBusinessDataFetch();
+                    Thread.Sleep(20);
+                    driver.Navigate().GoToUrl(businessUrl);
+                }
                 //UpdateProgress("web visit finished");
                 batchSize -= 1;
                 // Fetch social media links from the business website (e.g., from footer or social media icons)
@@ -605,6 +663,7 @@ namespace WindowsFormsApp2
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching social media links for {businessUrl}: {ex.Message}");
+                LoggerService.Error("Error fetching social media links for {businessUrl}", ex);
                 //UpdateProgress($"Error fetching social media links for {businessUrl}: {ex.Message}" + "-583");
             }
             finally
@@ -651,6 +710,7 @@ namespace WindowsFormsApp2
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error processing element: {ex.Message}");
+                    LoggerService.Error("Error processing element:", ex);
                     return emails;
                 }
             }
@@ -899,9 +959,37 @@ namespace WindowsFormsApp2
             }
             catch (Exception ex)
             {
+                LoggerService.Error($"Error exporting to Excel: {ex.Message}", ex);
                 MessageBox.Show($"Error exporting to Excel: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        public bool IsSessionActive(IWebDriver driver)
+        {
+            try
+            {
+                if (driver == null) return false;
+                var sessionProperty = driver.GetType().GetProperty("SessionId");
+                if (sessionProperty != null)
+                {
+                    var sessionId = sessionProperty.GetValue(driver);
+                    if (sessionId != null)
+                    {
+                        LoggerService.Info($"WebDriver Session ID: {sessionId}");
+                        return true; // Session is active
+                    }
+                }
+                driver?.Quit();
+                driver?.Dispose();
+                driver = null;
+                return false; // No valid session
+            }
+            catch (Exception)
+            {
+                return false; // Session is not active
+            }
+        }
+
 
         private Object[] updateGridList((string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite) result)
         {

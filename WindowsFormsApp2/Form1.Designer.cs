@@ -269,6 +269,7 @@ namespace WindowsFormsApp2
             this.Controls.Add(this.dataGridView);
             this.Name = "MainForm";
             this.Text = "Sky Crawler";
+            this.FormClosing += Form1_FormClosing;
             //((System.ComponentModel.ISupportInitialize)(this.dataGridView)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -329,6 +330,7 @@ namespace WindowsFormsApp2
                 MessageBox.Show("Please upload a file with search terms first.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
+            manageStartButton(false);
             //progressBar.Visible = true;
             //InitializeDataTable();
             if (cancellationTokenSource != null)
