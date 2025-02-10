@@ -21,6 +21,7 @@ using System.Drawing;
 using System.IO;
 using System.CodeDom.Compiler;
 using OpenQA.Selenium.Remote;
+using System.Text;
 
 namespace WindowsFormsApp2
 {
@@ -31,6 +32,12 @@ namespace WindowsFormsApp2
         private string[] searchTerms;
         private List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> tempRows = new List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
         private int batchSize = 35;
+        private static readonly HashSet<string> CountryList = new HashSet<string>
+        {
+            "Germany", "Australia", "United States", "USA", "Canada", "France", "Spain",
+            "United Kingdom", "UK", "India", "Italy", "Brazil", "Mexico", "Netherlands",
+            "Sweden", "Denmark", "Norway", "Bangladesh"
+        };
         private CancellationTokenSource cancellationTokenSource;
         List<string> chromeOptionArguements = new List<string> {
             "--headless",
@@ -152,7 +159,7 @@ namespace WindowsFormsApp2
                         //lblStatus.Text = "Crawling stopped.";
                         break;
                     }
-                    if (count > 100)
+                    if (count > 300)
                     {
                         count = 0;
                         driver.Quit();
@@ -367,8 +374,8 @@ namespace WindowsFormsApp2
                             var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
                             if (reviewListText != null && reviewListText.Count > 1)
                             {
-                                reviewCount = reviewListText[0];
-                                rating = reviewListText[1];
+                                rating = reviewListText[0];
+                                reviewCount = reviewListText[1];
                             }
                             string category = string.Empty;
                             string city = string.Empty;
@@ -376,26 +383,27 @@ namespace WindowsFormsApp2
                             string country = string.Empty;
                             string location = string.Empty;
                             string streetLocation = string.Empty;
-                            string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
+                            //string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
                             var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
                             var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
                             try
                             {
                                 var item = detailsElems[0].FindElement(By.CssSelector("button[data-item-id='address'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc"));
                                 location = item != null ? item.Text : string.Empty;
-                                var regex = new Regex(pattern);
-                                var match = regex.Match(location);
-                                if (match.Success)
-                                {
-                                    streetLocation = match.Groups["street"].Value;
-                                    city = match.Groups["city"].Value;
-                                    zip = match.Groups["zip"].Value;
-                                    country = match.Groups["country"].Value;
-                                }
-                                else
-                                {
-                                    streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
-                                }
+                                //var regex = new Regex(pattern);
+                                var addressObj = ParseAddress(location);
+                                streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                city = addressObj.City;
+                                zip = addressObj.ZipCode;
+                                country = addressObj.Country;
+                                //if (match.Success)
+                                //{
+                                //    streetLocation = match.Groups["street"].Value;
+                                //}
+                                //else
+                                //{
+                                //    streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                //}
                             }
                             catch (Exception ex)
                             {
@@ -534,6 +542,85 @@ namespace WindowsFormsApp2
             }
 
             return ratings;
+        }
+
+        public (string ZipCode, string City, string Country) ParseAddress(string fullAddress)
+        {
+            string zipCode = "";
+            string city = "";
+            string country = "";
+
+            // ✅ Enhanced Regex to support various formats including Bangladesh
+            Regex regex = new Regex(@"(\d{4,5})\s+([A-Za-zäöüÄÖÜß\s-]+),\s*([A-Za-z\s]+)$");
+            Match match = regex.Match(fullAddress);
+
+            if (match.Success)
+            {
+                zipCode = match.Groups[1].Value.Trim();  // Extracts ZIP Code (first number)
+                city = match.Groups[2].Value.Trim();    // Extracts City (text after zip)
+                country = match.Groups[3].Value.Trim(); // Extracts Country (last part)
+            }
+            else
+            {
+                // ✅ Fallback: Check for country manually
+                foreach (var countryName in CountryList)
+                {
+                    if (fullAddress.Contains(countryName))
+                    {
+                        country = countryName;
+                        break;
+                    }
+                }
+
+                // ✅ Extract ZIP Code (first 4-5 digit number)
+                Match zipMatch = Regex.Match(fullAddress, @"\b\d{4,5}\b");
+                if (zipMatch.Success)
+                {
+                    zipCode = zipMatch.Value;
+                }
+
+                // ✅ Extract City (first part after ZIP, remove common words like "Division")
+                string[] addressParts = fullAddress.Split(',');
+                if (addressParts.Length > 1)
+                {
+                    city = addressParts[1].Trim();
+                }
+
+                // ✅ Special Handling for Bangladesh
+                if (country == "Bangladesh")
+                {
+                    city = ExtractBangladeshCity(fullAddress);
+                }
+            }
+
+            return (zipCode, city, country);
+        }
+
+        private static string ExtractBangladeshCity(string address)
+        {
+            string[] commonDivisions = { "Dhaka", "Chattogram", "Khulna", "Rajshahi", "Barishal", "Sylhet", "Rangpur", "Mymensingh" };
+            string city = "";
+
+            foreach (string division in commonDivisions)
+            {
+                if (address.Contains(division))
+                {
+                    city = division;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(city))
+            {
+                // Fallback: Get city from the second part of the address
+                string[] addressParts = address.Split(',');
+                if (addressParts.Length > 1)
+                {
+                    city = addressParts[1].Trim();
+                }
+            }
+
+            return city;
         }
 
         private ChromeDriver GetChromeDriverForBusinessDataFetch()
@@ -781,37 +868,24 @@ namespace WindowsFormsApp2
             return hasMoreResults;
         }
 
-        private void ValidateDriverSession(IWebDriver driver, IJavaScriptExecutor jsExecutor)
+        private Dictionary<string, int> columnIndexCache;
+        public void InitializeColumnIndexCache(DataGridView dataGridView)
         {
-            try
-            {
-                if (driver == null)
-                {
-                    Console.WriteLine("Driver is null. Restarting...");
-                    ChromeOptions options = new ChromeOptions();
-                    driver = new ChromeDriver(options);
-                    driver.Manage().Window.Maximize();
-                    jsExecutor = (IJavaScriptExecutor)driver;
-                }
+            columnIndexCache = new Dictionary<string, int>();
 
-                if (string.IsNullOrEmpty(driver.CurrentWindowHandle)) // Check if window is still open
-                {
-                    Console.WriteLine("Driver session is invalid. Restarting...");
-                    ChromeOptions options = new ChromeOptions();
-                    driver = new ChromeDriver(options);
-                    driver.Manage().Window.Maximize();
-                    jsExecutor = (IJavaScriptExecutor)driver;
-                }
-
-            }
-            catch (WebDriverException)
+            foreach (DataGridViewColumn column in dataGridView.Columns)
             {
-                Console.WriteLine("Driver session is invalid. Restarting...");
-                ChromeOptions options = new ChromeOptions();
-                driver = new ChromeDriver(options);
-                driver.Manage().Window.Maximize();
-                jsExecutor = (IJavaScriptExecutor)driver;
+                columnIndexCache[column.HeaderText] = column.Index; // Store column index by name
             }
+        }
+
+        public int GetColumnIndex(string columnHeader)
+        {
+            if (columnIndexCache != null && columnIndexCache.TryGetValue(columnHeader, out int index))
+            {
+                return index; // Fast O(1) lookup
+            }
+            return -1; // Not found
         }
 
 
@@ -827,135 +901,216 @@ namespace WindowsFormsApp2
                 var confirmationForm = new ConfirmationForm("Do you want to remove the duplicate data?");
                 var result = confirmationForm.ShowDialog();
                 bool removeDuplicate = result == DialogResult.OK && confirmationForm.UserConfirmed;
+
+                var confirmationCsvForm = new ConfirmationForm("Do you want to export as csv?");
+                var resultExportType = confirmationCsvForm.ShowDialog();
+                bool exportCsv = resultExportType == DialogResult.OK && confirmationCsvForm.UserConfirmed;
+
+                DateTime now = DateTime.Now;
+                string formattedDate = now.ToString("dd MMM yyyy, HH:mm");
                 List<(string ResultTitle, string Address, string ContactNumber)> duplicateDataFlag = new List<(string ResultTitle, string Address, string ContactNumber)>();
-                using (var workbook = new XLWorkbook())
+                if (exportCsv)
                 {
-                    var worksheet = workbook.Worksheets.Add("Results");
-                    int headerIndex = 1;
-                    for (headerIndex = 1; headerIndex < SharedDataTableModel.SelectedFields.Count; headerIndex++)
+                    //csv header
+                    StringBuilder csvContent = new StringBuilder();
+                    for (int i = 0; i < dataGridView.Columns.Count; i++)
                     {
-                        worksheet.Cell(1, headerIndex).Value = SharedDataTableModel.SelectedFields[headerIndex].Name;
+                        csvContent.Append(dataGridView.Columns[i].HeaderText);
+                        csvContent.Append(",");
                     }
-                    worksheet.Cell(1, headerIndex).Value = "Date time";
-                    List<String> sheetColumnsValue = new List<String>();
-                    DateTime now = DateTime.Now;
-
-                    // Format it as "24 Jan 2025, hh:mm"
-                    string formattedDate = now.ToString("dd MMM yyyy, HH:mm");
-                    for (int i = 0; i < results.Count; i++)
+                    csvContent.Append("Date time");
+                    csvContent.AppendLine();
+                    if (removeDuplicate)
                     {
-                        if (removeDuplicate)
+                        InitializeColumnIndexCache(dataGridView);
+                    }
+                    // Add row data
+                    foreach (DataGridViewRow row in dataGridView.Rows)
+                    {
+                        if (!row.IsNewRow) // Ignore empty new row
                         {
-                            var hasDuplicate = duplicateDataFlag.Any(x =>
-                                x.ResultTitle.ToLower() == results[i].ResultTitle.ToLower() &&
-                                x.ContactNumber.ToLower() == results[i].ContactNumber.ToLower() &&
-                                x.Address.ToLower() == results[i].Address.ToLower()
-                            );
-                            if (hasDuplicate)
+                            if (removeDuplicate)
                             {
-                                continue;
+                                int titleIndex = GetColumnIndex("Name");
+                                int numberIndex = GetColumnIndex("Contact Number");
+                                int addressIndex = GetColumnIndex("Full_Address");
+
+                                var hasDuplicate = duplicateDataFlag.Any(x =>
+                                       x.ResultTitle.ToLower() == row.Cells[titleIndex].Value?.ToString().ToLower() &&
+                                       x.ContactNumber.ToLower() == row.Cells[numberIndex].Value?.ToString().ToLower() &&
+                                       x.Address.ToLower() == row.Cells[addressIndex].Value?.ToString().ToLower()
+                                   );
+                                if (hasDuplicate && titleIndex != -1 && numberIndex != -1 && addressIndex != -1)
+                                {
+                                    continue;
+                                }
+                                duplicateDataFlag.Add((row.Cells[titleIndex].Value?.ToString(), row.Cells[numberIndex].Value?.ToString(), row.Cells[addressIndex].Value?.ToString()));
                             }
-                            duplicateDataFlag.Add((results[i].ResultTitle, results[i].Address, results[i].ContactNumber));
+                            for (int i = 0; i < dataGridView.Columns.Count; i++)
+                            {
+                                csvContent.Append(row.Cells[i].Value?.ToString().Replace(",", " ")); // Remove extra commas
+                                csvContent.Append(",");
+                            }
+                            csvContent.Append(formattedDate);
+                            csvContent.AppendLine();
                         }
-
-                        int columnIndex = 1;
-                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Keyword") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].SearchTerm;
-                            columnIndex++;
-                        }
-                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Name") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].ResultTitle;
-                            columnIndex++;
-                        }
-                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Category") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].Category;
-                            columnIndex++;
-                        } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Full_Address") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].Address;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Street_Address") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].streetAddress;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "City") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].city;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Zip") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].zip;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Country") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].country;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Contact Number") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].ContactNumber;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Email") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
-                            columnIndex++;
-                        }
-                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Website") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].hrefValue;
-                            columnIndex++;
-                        }
-                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Facebook") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Linkedin") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Twitter") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Youtube") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Instagram") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Pinterest") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
-                            columnIndex++;
-                        }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Rating") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].Rating;
-                            columnIndex++;
-                        }
-                        if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Review Count") != null)
-                        {
-                            worksheet.Cell(i + 2, columnIndex).Value = results[i].ReviewCount;
-                            columnIndex++;
-                        }
-                        worksheet.Cell(i + 2, columnIndex).Value = formattedDate;
-                        columnIndex++;
-
                     }
+
                     SaveFileDialog saveFileDialog = new SaveFileDialog();
-                    // Set filter for Excel files
-                    saveFileDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*";
-                    saveFileDialog.DefaultExt = "xlsx";  // Default extension
+                    saveFileDialog.Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*";
+                    saveFileDialog.DefaultExt = "csv"; // Default extension
+
                     if (saveFileDialog.ShowDialog() == DialogResult.OK)
                     {
                         string filePath = saveFileDialog.FileName;
-                        workbook.SaveAs(filePath);
-                        MessageBox.Show("File exported successfully!", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        File.WriteAllText(filePath, csvContent.ToString(), Encoding.UTF8);
+
+                        MessageBox.Show("File exported successfully as CSV!", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
+                else
+                {
+                    using (var workbook = new XLWorkbook())
+                    {
+                        var worksheet = workbook.Worksheets.Add("Results");
+                        int headerIndex = 1;
+                        for (headerIndex = 1; headerIndex < SharedDataTableModel.SelectedFields.Count; headerIndex++)
+                        {
+                            worksheet.Cell(1, headerIndex).Value = SharedDataTableModel.SelectedFields[headerIndex].Name;
+                        }
+                        worksheet.Cell(1, headerIndex).Value = "Date time";
+                        List<String> sheetColumnsValue = new List<String>();
+                        for (int i = 0; i < results.Count; i++)
+                        {
+                            if (removeDuplicate)
+                            {
+                                var hasDuplicate = duplicateDataFlag.Any(x =>
+                                    x.ResultTitle.ToLower() == results[i].ResultTitle.ToLower() &&
+                                    x.ContactNumber.ToLower() == results[i].ContactNumber.ToLower() &&
+                                    x.Address.ToLower() == results[i].Address.ToLower()
+                                );
+                                if (hasDuplicate)
+                                {
+                                    continue;
+                                }
+                                duplicateDataFlag.Add((results[i].ResultTitle, results[i].Address, results[i].ContactNumber));
+                            }
+
+                            int columnIndex = 1;
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Keyword") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].SearchTerm;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Name") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].ResultTitle;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Category") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].Category;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Full_Address") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].Address;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Street_Address") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].streetAddress;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "City") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].city;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Zip") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].zip;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Country") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].country;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Contact Number") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].ContactNumber;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Email") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Website") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].hrefValue;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Facebook") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Linkedin") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Twitter") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Youtube") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Instagram") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Pinterest") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Rating") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].Rating;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Review Count") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].ReviewCount;
+                                columnIndex++;
+                            }
+                            worksheet.Cell(i + 2, columnIndex).Value = formattedDate;
+                            columnIndex++;
+
+                        }
+                        SaveFileDialog saveFileDialog = new SaveFileDialog();
+                        // Set filter for Excel files
+                        saveFileDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*";
+                        saveFileDialog.DefaultExt = "xlsx";  // Default extension
+
+                        if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                        {
+                            string filePath = saveFileDialog.FileName;
+                            workbook.SaveAs(filePath);
+                            MessageBox.Show("File exported successfully!", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                    }
+                }
+               
             }
             catch (Exception ex)
             {
