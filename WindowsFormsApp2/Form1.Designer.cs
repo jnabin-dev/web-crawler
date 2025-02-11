@@ -252,6 +252,15 @@ namespace WindowsFormsApp2
             //panel.Controls.Add(dataGridView);
             // 
             // Form1
+            Label lblFooter = new Label();
+            lblFooter.Text = "A Product of Codezzi | All Rights Reserved";
+            lblFooter.Font = new Font("Arial", 10, FontStyle.Italic);
+            lblFooter.ForeColor = Color.Gray;
+            lblFooter.AutoSize = false;
+            lblFooter.TextAlign = ContentAlignment.MiddleRight;
+            lblFooter.Dock = DockStyle.Bottom;
+            lblFooter.Height = 25; // Adjust as needed
+            lblFooter.Padding = new Padding(0, 2, 10, 0); // Right padding for alignment
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -262,6 +271,7 @@ namespace WindowsFormsApp2
             this.Controls.Add(this.instructionsGroupBox);
             this.Controls.Add(this.progressGroupBox);
             this.Controls.Add(this.btnUpload);
+            this.Controls.Add(lblFooter);
             this.Controls.Add(this.btnStart);
             this.Controls.Add(this.stopCrawlButton);
             this.Controls.Add(this.exportButton);
@@ -293,7 +303,7 @@ namespace WindowsFormsApp2
 
             int topButtonsBottom = btnUpload.Bottom; // Get the bottom position of the topmost button
             int bottomPadding = 30; // Add some padding at the bottom
-            int availableHeight = this.ClientSize.Height - topButtonsBottom - bottomPadding;
+            int availableHeight = this.ClientSize.Height - topButtonsBottom - bottomPadding - 10;
             dataGridView.Width = groupBoxWidth*2;
             // Set DataGridView's top position and height
             dataGridView.Top = topButtonsBottom + 15; // Add some padding below the buttons

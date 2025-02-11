@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,6 +16,10 @@ namespace WindowsFormsApp2
         public CustomizeDataFieldsForm()
         {
             InitializeComponent();
+            string fontPath = Path.Combine(Application.StartupPath, "assets", "fonts", "Mulish-Regular.ttf");
+            Font mulishRegularFont = FontLoader.LoadCustomFont(fontPath, FontLoader.fontSize, FontStyle.Regular);
+
+            FontLoader.ApplyFontToAllControls(this, mulishRegularFont);
             this.StartPosition = FormStartPosition.CenterScreen;
         }
     }

@@ -14,14 +14,12 @@ using SeleniumExtras.WaitHelpers;
 using WebDriverManager.DriverConfigs.Impl;
 using WebDriverManager;
 using Keys = OpenQA.Selenium.Keys;
-using DocumentFormat.OpenXml.Spreadsheet;
 using System.Web;
-using System.Linq.Expressions;
 using System.Drawing;
 using System.IO;
-using System.CodeDom.Compiler;
-using OpenQA.Selenium.Remote;
 using System.Text;
+using WebDriverManager.Helpers;
+using System.Diagnostics;
 
 namespace WindowsFormsApp2
 {
@@ -30,6 +28,9 @@ namespace WindowsFormsApp2
         List<string> dataColumns = new List<string>();
         //Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
         private string[] searchTerms;
+        private Font mulishRegularFont;
+        private int driverProcessId;
+        private int businessDriverProcessId;
         private List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> tempRows = new List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
         private int batchSize = 35;
         private static readonly HashSet<string> CountryList = new HashSet<string>
@@ -68,6 +69,13 @@ namespace WindowsFormsApp2
         public Form1()
         {
             InitializeComponent();
+
+            // Load font from file (make sure the file path is correct)
+            string fontPath = Path.Combine(Application.StartupPath, "assets", "fonts", "Mulish-Regular.ttf");
+            mulishRegularFont = FontLoader.LoadCustomFont(fontPath, FontLoader.fontSize, FontStyle.Regular);
+
+            FontLoader.ApplyFontToAllControls(this, mulishRegularFont);
+
             LoggerService.Info("Sky Crawler Application Started.");
             this.StartPosition = FormStartPosition.CenterScreen;
             this.ResizeEnd += Form1_Resize;
@@ -134,9 +142,13 @@ namespace WindowsFormsApp2
             options.AddArgument("--no-sandbox");  // Helps in some environments
             options.AddArgument("--disable-dev-shm-usage"); // Prevents shared memory issues
             options.AddArgument("--disable-accelerated-2d-canvas"); // Avoids rendering crashes
-            IWebDriver driver = new ChromeDriver(options);
-            driver.Manage().Window.Maximize();
 
+            ChromeDriverService service = ChromeDriverService.CreateDefaultService();
+            service.HideCommandPromptWindow = true; // ✅ Hide console window
+
+            IWebDriver driver = new ChromeDriver(service, options);
+            driver.Manage().Window.Maximize();
+            driverProcessId = service.ProcessId;
             return driver;
         }
 
@@ -145,7 +157,7 @@ namespace WindowsFormsApp2
             try
             {
                 //uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
-                new DriverManager().SetUpDriver(new ChromeConfig()); // Automatically downloads ChromeDriver
+                new DriverManager().SetUpDriver(new ChromeConfig(), VersionResolveStrategy.MatchingBrowser); // Automatically downloads ChromeDriver
                 IWebDriver driver = RestartPrimaryWebDriver();
                 IWebDriver chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
                 driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
@@ -159,26 +171,34 @@ namespace WindowsFormsApp2
                         //lblStatus.Text = "Crawling stopped.";
                         break;
                     }
-                    if (count > 300)
+                    if (count > 11)
                     {
                         count = 0;
                         driver.Quit();
                         driver.Dispose();
                         driver = null;
+                        KillChromeDriverProcess(driverProcessId);
+                        chromeDriverForBusinessData.Quit();
+                        chromeDriverForBusinessData.Dispose();
+                        chromeDriverForBusinessData = null;
+                        KillChromeDriverProcess(businessDriverProcessId);
                         LoggerService.Info("Driver closed.");
                         LoggerService.Info("New driver creating for primary data, 167");
                         driver = RestartPrimaryWebDriver();
-                        if (IsSessionActive(driver))
-                        {
-                            driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
-                        } else
-                        {
-                            LoggerService.Info("New driver creating for primary data, 169");
-                            driver = GetChromeDriverForBusinessDataFetch();
-                            driver = RestartPrimaryWebDriver();
-                            Thread.Sleep(30);
-                            driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
-                        }
+                        chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
+                        LoggerService.Info("New driver creating for business data, 189");
+                        driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                        //if (IsSessionActive(driver))
+                        //{
+                        //    driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                        //} else
+                        //{
+                        //    LoggerService.Info("New driver creating for primary data, 169");
+                        //    driver = GetChromeDriverForBusinessDataFetch();
+                        //    driver = RestartPrimaryWebDriver();
+                        //    Thread.Sleep(30);
+                        //    driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                        //}
                         continue;
                     }
                     try
@@ -200,11 +220,22 @@ namespace WindowsFormsApp2
                 driver.Quit();
                 driver.Dispose();
                 driver = null;
+                KillChromeDriverProcess(driverProcessId);
                 chromeDriverForBusinessData.Quit();
                 chromeDriverForBusinessData.Dispose();
                 chromeDriverForBusinessData = null;
+                KillChromeDriverProcess(businessDriverProcessId);
                 // Export results to Excel
                 //ExportToExcel(results);
+                if(tempRows.Count > 0)
+                {
+                    foreach (var row in tempRows)
+                    {
+                        InsertRowIntoDatatable(row, true);
+                    }
+
+                    tempRows.Clear();
+                }
                 UpdateProgress("Crawling finished.");
                 LoggerService.Info("Crawling Completed Successfully.");
                 manageStartButton(true);
@@ -215,6 +246,24 @@ namespace WindowsFormsApp2
                 MessageBox.Show($"Error during crawling: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 //UpdateProgress("Error occurred." + "-155");
                 LoggerService.Error("Crawling error - 199", ex);
+            }
+        }
+
+        private void KillChromeDriverProcess(int processId)
+        {
+            if (processId == 0 ) return;
+            try
+            {
+                Process chromeDriverProcess = Process.GetProcessById(processId);
+                if (chromeDriverProcess != null)
+                {
+                    Console.WriteLine($"Killing ChromeDriver process with PID: {processId}");
+                    chromeDriverProcess.Kill();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error killing ChromeDriver process: {ex.Message}");
             }
         }
 
@@ -396,6 +445,15 @@ namespace WindowsFormsApp2
                                 city = addressObj.City;
                                 zip = addressObj.ZipCode;
                                 country = addressObj.Country;
+                                streetLocation = addressObj.Street; 
+                                if(streetLocation == string.Empty|| streetLocation == null)
+                                {
+                                    streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                    if (streetLocation.Contains("Closed"))
+                                    {
+                                        streetLocation = "";
+                                    }
+                                }
                                 //if (match.Success)
                                 //{
                                 //    streetLocation = match.Groups["street"].Value;
@@ -498,9 +556,15 @@ namespace WindowsFormsApp2
                 return false; // Keep scrolling if the element is not found
             }
         }
-        private void InsertRowIntoDatatable((string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite) dataTobeAdded)
+        private void InsertRowIntoDatatable((string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite) dataTobeAdded, bool skipTempRow = false)
         {
-            tempRows.Add(dataTobeAdded);
+            if(!skipTempRow) tempRows.Add(dataTobeAdded);
+            if (skipTempRow)
+            {
+                var rowToBeAdded = updateGridList(dataTobeAdded);
+                dataGridView.Rows.Add(rowToBeAdded);
+                return;
+            }
             if(tempRows.Count >= 10 || dataGridView.RowCount == 0)
             {
                 Invoke(new Action(() =>
@@ -544,21 +608,23 @@ namespace WindowsFormsApp2
             return ratings;
         }
 
-        public (string ZipCode, string City, string Country) ParseAddress(string fullAddress)
+        public (string Street, string ZipCode, string City, string Country) ParseAddress(string fullAddress)
         {
+            string street = "";
             string zipCode = "";
             string city = "";
             string country = "";
 
             // ✅ Enhanced Regex to support various formats including Bangladesh
-            Regex regex = new Regex(@"(\d{4,5})\s+([A-Za-zäöüÄÖÜß\s-]+),\s*([A-Za-z\s]+)$");
+            Regex regex = new Regex(@"^(.*?),?\s*(\d{4,5})\s+([A-Za-zäöüÄÖÜß\s-]+),\s*([A-Za-z\s]+)$");
             Match match = regex.Match(fullAddress);
 
             if (match.Success)
             {
-                zipCode = match.Groups[1].Value.Trim();  // Extracts ZIP Code (first number)
-                city = match.Groups[2].Value.Trim();    // Extracts City (text after zip)
-                country = match.Groups[3].Value.Trim(); // Extracts Country (last part)
+                street = match.Groups[1].Value.Trim();  // Extracts Street Name
+                zipCode = match.Groups[2].Value.Trim();  // Extracts ZIP Code (first number)
+                city = match.Groups[3].Value.Trim();    // Extracts City (text after zip)
+                country = match.Groups[4].Value.Trim(); // Extracts Country (last part)
             }
             else
             {
@@ -568,6 +634,7 @@ namespace WindowsFormsApp2
                     if (fullAddress.Contains(countryName))
                     {
                         country = countryName;
+                        fullAddress = fullAddress.Replace(countryName, "").Trim(); // Remove country from address
                         break;
                     }
                 }
@@ -577,6 +644,7 @@ namespace WindowsFormsApp2
                 if (zipMatch.Success)
                 {
                     zipCode = zipMatch.Value;
+                    fullAddress = fullAddress.Replace(zipCode, "").Trim(); // Remove zip code from address
                 }
 
                 // ✅ Extract City (first part after ZIP, remove common words like "Division")
@@ -584,6 +652,7 @@ namespace WindowsFormsApp2
                 if (addressParts.Length > 1)
                 {
                     city = addressParts[1].Trim();
+                    street = addressParts[0].Trim(); // First part is street name
                 }
 
                 // ✅ Special Handling for Bangladesh
@@ -593,7 +662,7 @@ namespace WindowsFormsApp2
                 }
             }
 
-            return (zipCode, city, country);
+            return (street, zipCode, city, country);
         }
 
         private static string ExtractBangladeshCity(string address)
@@ -641,7 +710,7 @@ namespace WindowsFormsApp2
 
             var driver = new ChromeDriver(service, options);
             driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(10);
-
+            businessDriverProcessId = service.ProcessId;
             return driver;
         }
 
@@ -668,16 +737,19 @@ namespace WindowsFormsApp2
             try
             {
                 //UpdateProgress("driver initialize finished");
-                if (IsSessionActive(driver))
-                {
-                    driver.Navigate().GoToUrl(businessUrl);
-                } else
-                {
-                    LoggerService.Info("New driver creating for business data");
-                    driver = GetChromeDriverForBusinessDataFetch();
-                    Thread.Sleep(20);
-                    driver.Navigate().GoToUrl(businessUrl);
-                }
+                driver.Navigate().GoToUrl(businessUrl);
+                //WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                //wait.Until(d => ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").Equals("interactive"));
+                //if (IsSessionActive(driver))
+                //{
+                //    driver.Navigate().GoToUrl(businessUrl);
+                //} else
+                //{
+                //    LoggerService.Info("New driver creating for business data");
+                //    driver = GetChromeDriverForBusinessDataFetch();
+                //    Thread.Sleep(20);
+                //    driver.Navigate().GoToUrl(businessUrl);
+                //}
                 //UpdateProgress("web visit finished");
                 batchSize -= 1;
                 // Fetch social media links from the business website (e.g., from footer or social media icons)
@@ -732,19 +804,20 @@ namespace WindowsFormsApp2
                 }
                 if (!isMailFetch)
                 {
-                    //var emails = FetchEmails(driver);
+                    string pageSource = driver.PageSource;
+                    var emails = ExtractEmails(pageSource);
 
-                    //// Combine all emails into one string (comma-separated)
-                    //if (emails.Count > 0)
-                    //{
-                    //    string combinedEmails = string.Join(", ", emails);
-                    //    socialLinks["emails"] = combinedEmails; // Single key for all emails
-                    //}
-                    //else
-                    //{
-                    //    socialLinks["emails"] = string.Empty;
-                    //}
-                    socialLinks["emails"] = string.Empty;
+                    // Combine all emails into one string (comma-separated)
+                    if (emails.Count > 0)
+                    {
+                        string combinedEmails = string.Join(", ", emails);
+                        socialLinks["emails"] = combinedEmails; // Single key for all emails
+                    }
+                    else
+                    {
+                        socialLinks["emails"] = string.Empty;
+                    }
+                    //socialLinks["emails"] = string.Empty;
                 }
             }
             catch (Exception ex)
@@ -764,6 +837,24 @@ namespace WindowsFormsApp2
             }
             //UpdateProgress("returning links");
             return socialLinks;
+        }
+
+        public static List<string> ExtractEmails(string pageSource)
+        {
+            List<string> emailList = new List<string>();
+
+            // ✅ Regex pattern for extracting emails
+            string pattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}";
+
+            MatchCollection matches = Regex.Matches(pageSource, pattern);
+            foreach (Match match in matches)
+            {
+                if (!emailList.Contains(match.Value))
+                {
+                    emailList.Add(match.Value); // Avoid duplicates
+                }
+            }
+            return emailList;
         }
 
         public static List<string> FetchEmails(IWebDriver driver)
@@ -1130,7 +1221,7 @@ namespace WindowsFormsApp2
                     var sessionId = sessionProperty.GetValue(driver);
                     if (sessionId != null)
                     {
-                        LoggerService.Info($"WebDriver Session ID: {sessionId}");
+                        //LoggerService.Info($"WebDriver Session ID: {sessionId}");
                         return true; // Session is active
                     }
                 }
@@ -1141,6 +1232,9 @@ namespace WindowsFormsApp2
             }
             catch (Exception)
             {
+                driver?.Quit();
+                driver?.Dispose();
+                driver = null;
                 return false; // Session is not active
             }
         }
