@@ -29,7 +29,14 @@ namespace WindowsFormsApp2
         //Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
         private string[] searchTerms;
         private Font mulishRegularFont;
+        private IWebDriver driver;
+        private IWebDriver chromeDriverForBusinessData;
         private int driverProcessId;
+        //private string[] userAgents = {
+        //    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.134 Safari/537.36",
+        //    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.5672.127 Safari/537.36",
+        //    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5628.126 Safari/537.36"
+        //};
         private int businessDriverProcessId;
         private List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> tempRows = new List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
         private int batchSize = 35;
@@ -68,11 +75,10 @@ namespace WindowsFormsApp2
         private List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> results;
         public Form1()
         {
-            InitializeComponent();
-
             // Load font from file (make sure the file path is correct)
-            string fontPath = Path.Combine(Application.StartupPath, "assets", "fonts", "Mulish-Regular.ttf");
+            string fontPath = Path.Combine(Application.StartupPath, "assets", "fonts", "DancingScript-Regular.ttf");
             mulishRegularFont = FontLoader.LoadCustomFont(fontPath, FontLoader.fontSize, FontStyle.Regular);
+            InitializeComponent();
 
             FontLoader.ApplyFontToAllControls(this, mulishRegularFont);
 
@@ -142,6 +148,9 @@ namespace WindowsFormsApp2
             options.AddArgument("--no-sandbox");  // Helps in some environments
             options.AddArgument("--disable-dev-shm-usage"); // Prevents shared memory issues
             options.AddArgument("--disable-accelerated-2d-canvas"); // Avoids rendering crashes
+            Random rand = new Random();
+            //string randomUserAgent = userAgents[rand.Next(userAgents.Length)];
+            //options.AddArgument($"--user-agent={randomUserAgent}");
 
             ChromeDriverService service = ChromeDriverService.CreateDefaultService();
             service.HideCommandPromptWindow = true; // ✅ Hide console window
@@ -158,9 +167,9 @@ namespace WindowsFormsApp2
             {
                 //uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
                 new DriverManager().SetUpDriver(new ChromeConfig(), VersionResolveStrategy.MatchingBrowser); // Automatically downloads ChromeDriver
-                IWebDriver driver = RestartPrimaryWebDriver();
-                IWebDriver chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
-                driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
+                driver = RestartPrimaryWebDriver();
+                chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
+                driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
                 int count = 0;
                 foreach (string term in searchTerms)
                 {
@@ -187,18 +196,7 @@ namespace WindowsFormsApp2
                         driver = RestartPrimaryWebDriver();
                         chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
                         LoggerService.Info("New driver creating for business data, 189");
-                        driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
-                        //if (IsSessionActive(driver))
-                        //{
-                        //    driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
-                        //} else
-                        //{
-                        //    LoggerService.Info("New driver creating for primary data, 169");
-                        //    driver = GetChromeDriverForBusinessDataFetch();
-                        //    driver = RestartPrimaryWebDriver();
-                        //    Thread.Sleep(30);
-                        //    driver.Navigate().GoToUrl("https://www.google.com/maps?hl=en");
-                        //}
+                        driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
                         continue;
                     }
                     try
@@ -306,9 +304,25 @@ namespace WindowsFormsApp2
             }
         }
 
+        public void ClearCookies(IWebDriver driver)
+        {
+            try
+            {
+                driver.Manage().Cookies.DeleteAllCookies(); // ✅ Clears all cookies
+                //driver.Navigate().Refresh(); // ✅ Refreshes the page after clearing cookies
+                Console.WriteLine("✅ Cookies cleared successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error clearing cookies: {ex.Message}");
+            }
+        }
+
+
         private async Task processCrawlingAsync(IWebDriver driver, IWebDriver webDriver, string term, CancellationToken cancellationToken, bool fetchBusinessData)
         {
             var searchBox = driver.FindElement(By.Id("searchboxinput"));
+            ClearCookies(driver);
             searchBox.Clear();
             searchBox.SendKeys(term);
             searchBox.SendKeys(Keys.Enter);
@@ -355,7 +369,7 @@ namespace WindowsFormsApp2
                             }
                             //lcr4fd S9kvJb
                             Dictionary<string, string> keyValuePairs = new Dictionary<string, string>();
-                            var linkElement = resultElement.FindElements(By.ClassName("lcr4fd"));
+                            //var linkElement = resultElement.FindElements(By.ClassName("lcr4fd"));
                             string hrefValue = string.Empty;
 
                             processedResults.Add(title);
@@ -366,8 +380,28 @@ namespace WindowsFormsApp2
                             lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                             jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
                             ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
+                            var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
+                            string category = string.Empty;
+                            if (elements != null)
+                            {
+                                category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
+                                if (elements != null && category.Length > 0)
+                                {
+                                    category = category.Split('·')[0];
+                                }
+                            }
                             clickableElement[i].Click();
+                            WebDriverWait newWait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+
+                            // ✅ Wait until the div with the required class is visible
+                            IWebElement sidebar = newWait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@role='main' and contains(@class, 'm6QErb')]")));
+
+                            //Console.WriteLine("✅ Business details sidebar detected.");
+                            //Thread.Sleep(100);
                             i++;
+                            var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
+                            var hrefItem = detailsElems[0].FindElement(By.CssSelector("a[data-item-id='authority']"));
+                            hrefValue = hrefItem.GetAttribute("href");
                             string contactNumber = string.Empty;
                             try
                             {
@@ -392,10 +426,10 @@ namespace WindowsFormsApp2
                             //    continue;
                             //}
                             try{
-                                if (fetchBusinessData && linkElement.Count > 0)
+                                if (fetchBusinessData && hrefValue.Length > 0)
                                 {
                                     hasUrl = true;
-                                    hrefValue = linkElement[0].GetDomAttribute("href");
+                                    //hrefValue = linkElement[0].GetDomAttribute("href");
                                     //if (batchSize == 0)
                                     //{
                                     //    webDriver.Quit();
@@ -426,15 +460,12 @@ namespace WindowsFormsApp2
                                 rating = reviewListText[0];
                                 reviewCount = reviewListText[1];
                             }
-                            string category = string.Empty;
                             string city = string.Empty;
                             string zip = string.Empty;
                             string country = string.Empty;
                             string location = string.Empty;
                             string streetLocation = string.Empty;
                             //string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
-                            var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
-                            var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
                             try
                             {
                                 var item = detailsElems[0].FindElement(By.CssSelector("button[data-item-id='address'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc"));
@@ -471,14 +502,7 @@ namespace WindowsFormsApp2
                             }
                             //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
                             //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
-                            if (elements != null)
-                            {
-                                category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
-                                if (elements != null && category.Length > 0)
-                                {
-                                    category = category.Split('·')[0];
-                                }
-                            }
+                           
                             var dataTobeAdded = (term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue);
                             results.Add(dataTobeAdded);
                             //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
@@ -538,6 +562,21 @@ namespace WindowsFormsApp2
         {
             LoggerService.Info("Sky Crawler Application Closed.");
             LoggerService.Close();
+            if (driver != null)
+            {
+                driver.Quit();
+                driver.Dispose();
+                driver = null;
+                KillChromeDriverProcess(driverProcessId);
+            }
+            
+            if (chromeDriverForBusinessData != null)
+            {
+                chromeDriverForBusinessData.Quit();
+                chromeDriverForBusinessData.Dispose();
+                chromeDriverForBusinessData = null;
+                KillChromeDriverProcess(businessDriverProcessId);
+            }
         }
 
         private bool IsEndOfScroll(IWebDriver driver)

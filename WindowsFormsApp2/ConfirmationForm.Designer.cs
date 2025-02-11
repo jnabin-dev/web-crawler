@@ -55,7 +55,7 @@ namespace WindowsFormsApp2
             yesButton = new Button
             {
                 Text = "Yes",
-                Location = new System.Drawing.Point(10, 50),
+                Location = new System.Drawing.Point(10, 55),
                 Size = new System.Drawing.Size(75, 30)
             };
             yesButton.Click += YesButton_Click;
@@ -64,7 +64,7 @@ namespace WindowsFormsApp2
             noButton = new Button
             {
                 Text = "No",
-                Location = new System.Drawing.Point(110, 50),
+                Location = new System.Drawing.Point(110, 55),
                 Size = new System.Drawing.Size(75, 30)
             };
             noButton.Click += NoButton_Click;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -232,7 +233,7 @@ namespace WindowsFormsApp2
             this.clearButton.Text = "Clear";
             this.clearButton.UseVisualStyleBackColor = true;
             this.clearButton.Click += new System.EventHandler(this.clearDataButton_Click);
-
+            //btnStart.Font = new Font();
             //Panel panel = new Panel
             //{
             //    Dock = DockStyle.Fill // Fill remaining space after the buttons
@@ -257,16 +258,38 @@ namespace WindowsFormsApp2
             lblFooter.Font = new Font("Arial", 10, FontStyle.Italic);
             lblFooter.ForeColor = Color.Gray;
             lblFooter.AutoSize = false;
-            lblFooter.TextAlign = ContentAlignment.MiddleRight;
+            lblFooter.TextAlign = ContentAlignment.MiddleCenter;
             lblFooter.Dock = DockStyle.Bottom;
             lblFooter.Height = 25; // Adjust as needed
-            lblFooter.Padding = new Padding(0, 2, 10, 0); // Right padding for alignment
+            lblFooter.Padding = new Padding(0, 5, 0, 5);
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             //this.ClientSize = new System.Drawing.Size(400, 200); // Adjust size as needed
             //this.Controls.Add(this.dataGridView);
             //this.Controls.Add(panel);
+            // ✅ Set Button Background Colors
+            btnUpload.BackColor = ColorTranslator.FromHtml("#007BFF"); // Blue
+            btnStart.BackColor = ColorTranslator.FromHtml("#28A745"); // Green
+            stopCrawlButton.BackColor = ColorTranslator.FromHtml("#DC3545"); // Red
+            exportButton.BackColor = ColorTranslator.FromHtml("#17A2B8"); // Teal Blue
+            clearButton.BackColor = ColorTranslator.FromHtml("#FFC107"); // Orange
+
+            // ✅ Set Text Colors for Better Visibility
+            btnUpload.ForeColor = Color.White;
+            btnStart.ForeColor = Color.White;
+            stopCrawlButton.ForeColor = Color.White;
+            exportButton.ForeColor = Color.White;
+            clearButton.ForeColor = Color.Black; // Darker text for better contrast
+
+
+            // ✅ Remove border and set a modern flat style
+            ConfigureButton(btnUpload, "#007BFF"); // Blue
+            ConfigureButton(btnStart, "#28A745"); // Green
+            ConfigureButton(stopCrawlButton, "#DC3545"); // Red
+            ConfigureButton(exportButton, "#17A2B8"); // Teal Blue
+            ConfigureButton(clearButton, "#FFC107"); // Orange
+
             this.Controls.Add(this.toolStrip); // Add the MenuStrip to the form
             this.Controls.Add(this.instructionsGroupBox);
             this.Controls.Add(this.progressGroupBox);
@@ -287,6 +310,32 @@ namespace WindowsFormsApp2
         }
 
         #endregion
+
+        private void ApplyRoundedCorners(Button button, int radius)
+        {
+            Rectangle rect = new Rectangle(0, 0, button.Width, button.Height);
+            GraphicsPath path = new GraphicsPath();
+
+            int arcSize = radius * 2;
+            path.AddArc(rect.X, rect.Y, arcSize, arcSize, 180, 90);
+            path.AddArc(rect.Right - arcSize, rect.Y, arcSize, arcSize, 270, 90);
+            path.AddArc(rect.Right - arcSize, rect.Bottom - arcSize, arcSize, arcSize, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - arcSize, arcSize, arcSize, 90, 90);
+            path.CloseFigure();
+
+            button.Region = new Region(path);
+        }
+
+        private void ConfigureButton(Button button, string hexColor)
+        {
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0; // ✅ Removes border
+            button.FlatAppearance.MouseDownBackColor = ColorTranslator.FromHtml(hexColor);
+            button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(ColorTranslator.FromHtml(hexColor)); // Lighter on hover
+            button.BackColor = ColorTranslator.FromHtml(hexColor);
+            ApplyRoundedCorners(button, 2);
+            //button.ForeColor = Color.White; // White text for contrast
+        }
 
         private void AdjustDataGridViewHeight()
         {
