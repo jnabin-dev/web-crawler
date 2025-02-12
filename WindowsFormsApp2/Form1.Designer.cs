@@ -204,7 +204,7 @@ namespace WindowsFormsApp2
             this.btnUpload.Text = "Upload File";
             this.btnUpload.UseVisualStyleBackColor = true;
             this.btnUpload.Click += new System.EventHandler(this.btnUpload_Click);
-
+            //this.btnUpload.Font = mulishRegularFont;
             this.btnStart.Location = new System.Drawing.Point(130, 180); // Set position
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(100, 40); // Set size
@@ -399,7 +399,7 @@ namespace WindowsFormsApp2
             cancellationTokenSource = new CancellationTokenSource();
             dataGridView.Rows.Clear();
             //UpdateProgress("", true);
-            results = new System.Collections.Generic.List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string>, string companyWebsite)>();
+            results = new List<BusinessInfo>();
             var confirmationForm = new ConfirmationForm("Do you want to scrape email and other social media links from the business website? (It can slow down the crawler speed.)");
             var result = confirmationForm.ShowDialog();
             animatedLoader.Visible = true;

@@ -30,6 +30,17 @@ namespace WindowsFormsApp2
                 new GridColumnConfig("Pinterest", null),
                 new GridColumnConfig("Rating", null),
                 new GridColumnConfig("Review Count", null),
+                new GridColumnConfig("Claim", null),
+                new GridColumnConfig("Hours_Info", null),
+                new GridColumnConfig("Monday", null),
+                new GridColumnConfig("Tuesday", null),
+                new GridColumnConfig("Wednesday", null),
+                new GridColumnConfig("Thursday", null),
+                new GridColumnConfig("Friday", null),
+                new GridColumnConfig("Saturday", null),
+                new GridColumnConfig("Sunday", null),
+                new GridColumnConfig("Located_in", null),
+                new GridColumnConfig("Attributes", null),
             };
 
         public SharedDataTableModel()

@@ -18,8 +18,8 @@ namespace WindowsFormsApp2
         {
             ConfirmationText = confirmationText;
             InitializeComponent();
-            string fontPath = Path.Combine(Application.StartupPath, "assets", "fonts", "Mulish-Regular.ttf");
-            Font mulishRegularFont = FontLoader.LoadCustomFont(fontPath, FontLoader.fontSize, FontStyle.Regular);
+            string fontPath = Path.Combine(Application.StartupPath, "assets", "fonts", "DancingScript-Regular.ttf");
+            Font mulishRegularFont = FontLoader.LoadFont(FontStyle.Regular);
 
             FontLoader.ApplyFontToAllControls(this, mulishRegularFont);
         }

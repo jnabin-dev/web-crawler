@@ -17,7 +17,7 @@ namespace WindowsFormsApp2
         {
             InitializeComponent();
             string fontPath = Path.Combine(Application.StartupPath, "assets", "fonts", "Mulish-Regular.ttf");
-            Font mulishRegularFont = FontLoader.LoadCustomFont(fontPath, FontLoader.fontSize, FontStyle.Regular);
+            Font mulishRegularFont = FontLoader.LoadFont(FontStyle.Regular);
 
             FontLoader.ApplyFontToAllControls(this, mulishRegularFont);
             this.StartPosition = FormStartPosition.CenterScreen;

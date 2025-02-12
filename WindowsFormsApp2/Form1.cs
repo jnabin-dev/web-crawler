@@ -20,6 +20,7 @@ using System.IO;
 using System.Text;
 using WebDriverManager.Helpers;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace WindowsFormsApp2
 {
@@ -38,7 +39,7 @@ namespace WindowsFormsApp2
         //    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5628.126 Safari/537.36"
         //};
         private int businessDriverProcessId;
-        private List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> tempRows = new List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
+        private List<BusinessInfo> tempRows = new List<BusinessInfo>();
         private int batchSize = 35;
         private static readonly HashSet<string> CountryList = new HashSet<string>
         {
@@ -72,16 +73,21 @@ namespace WindowsFormsApp2
                     "a[href*='youtube.com']",
                     "a[href*='pinterest.com']"
                 };
-        private List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> results;
+        private List<BusinessInfo> results;
         public Form1()
         {
             // Load font from file (make sure the file path is correct)
             string fontPath = Path.Combine(Application.StartupPath, "assets", "fonts", "DancingScript-Regular.ttf");
-            mulishRegularFont = FontLoader.LoadCustomFont(fontPath, FontLoader.fontSize, FontStyle.Regular);
+            //mulishRegularFont = FontLoader.LoadFont(FontStyle.Regular);
             InitializeComponent();
+            foreach (var resource in Assembly.GetExecutingAssembly().GetManifestResourceNames())
+            {
+                Console.WriteLine(resource);
+            }
 
-            FontLoader.ApplyFontToAllControls(this, mulishRegularFont);
-
+            //FontLoader.ApplyFontToAllControls(this, mulishRegularFont);
+            //btnUpload.Font = mulishRegularFont;
+            //btnUpload.Text = "djdjdjdj";
             LoggerService.Info("Sky Crawler Application Started.");
             this.StartPosition = FormStartPosition.CenterScreen;
             this.ResizeEnd += Form1_Resize;
@@ -420,6 +426,20 @@ namespace WindowsFormsApp2
                                 //UpdateProgress(ex.Message + "-267");
                                 LoggerService.Error("Crawling error - 312", ex);
                             }
+                            string hourInfo = string.Empty;
+                            try
+                            {
+                                var hourInfoElement = detailsElems[0].FindElement(By.CssSelector(".t39EBf.GUrTXd"));
+                                hourInfo = hourInfoElement != null ? hourInfoElement.GetAttribute("aria-label") : string.Empty;
+                            } catch(Exception exc)
+                            {
+                                LoggerService.Error("invalid hour info", exc);
+                            }
+                            var businessHours = new Dictionary<string, string>();
+                            if (hourInfo != null && hourInfo.Length > 0)
+                            {
+                                businessHours = ConvertBusinessHours(hourInfo);
+                            }
                             UpdateProgress($"Record no: {(results.Count + 1).ToString()}");
                             UpdateProgress($"Title: {title}");
                             UpdateProgress($"------------------------");
@@ -434,7 +454,7 @@ namespace WindowsFormsApp2
                             //    continue;
                             //}
                             try{
-                                if (fetchBusinessData && hrefValue.Length > 0)
+                                if (fetchBusinessData && hrefValue.Length > 0 && !hrefValue.ToLower().Contains("facebook"))
                                 {
                                     hasUrl = true;
                                     //hrefValue = linkElement[0].GetDomAttribute("href");
@@ -452,7 +472,7 @@ namespace WindowsFormsApp2
                                 else
                                 {
                                     hasUrl = false;
-                                    Thread.Sleep(200);
+                                    Thread.Sleep(10);
                                 }
                             } catch (Exception ex)
                             {
@@ -472,6 +492,7 @@ namespace WindowsFormsApp2
                             string zip = string.Empty;
                             string country = string.Empty;
                             string location = string.Empty;
+                            bool claim = false;
                             string streetLocation = string.Empty;
                             //string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
                             try
@@ -508,10 +529,51 @@ namespace WindowsFormsApp2
                                 LoggerService.Error("Crawling error - 392", ex);
                                 location = string.Empty;
                             }
+                            string locateInText = string.Empty;
                             //var locationElems = driver.FindElements(By.XPath("//div[@class='Io6YTe fontBodyMedium kR99db fdkmkc']"));
                             //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
-                           
-                            var dataTobeAdded = (term, title, reviewCount, rating, contactNumber, category, location, streetLocation, city, zip, country, keyValuePairs, hrefValue);
+                            try
+                            {
+                                var checkClaim = detailsElems[0].FindElement(By.CssSelector("a[data-item-id='merchant']"));
+                                claim = checkClaim != null && checkClaim.GetAttribute("href") != null;
+                            }
+                            catch (Exception ex) { 
+                                claim = false;
+                            }
+                            try
+                            {
+                                var locateIn = detailsElems[0].FindElement(By.CssSelector("button[data-item-id='locatedin']"));
+                                locateInText = locateIn != null ? locateIn.GetAttribute("aria-label") : string.Empty;
+                            }
+                            catch (Exception ex)
+                            {
+                                locateInText = string.Empty;
+                            }
+                            string attributes = string.Empty;
+                            try
+                            {
+                                var attriElement = detailsElems[0].FindElements(By.CssSelector("div[data-item-id='place-info-links'] Io6YTe.fontBodyMedium.kR99db.fdkmkc "));
+                                foreach(var item in attriElement)
+                                {
+                                    if(attributes.Length == 0)
+                                    {
+                                        attributes = item.Text;
+                                    } else
+                                    {
+                                        attributes += $", {item.Text}";
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                
+                            }
+                            var dataTobeAdded = new BusinessInfo(
+                                term, title, reviewCount, rating, contactNumber, 
+                                category, location, streetLocation, city, zip, 
+                                country, keyValuePairs, hrefValue, claim, hourInfo,
+                                businessHours, locateInText, attributes
+                            );
                             results.Add(dataTobeAdded);
                             //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
                             InsertRowIntoDatatable(dataTobeAdded);
@@ -607,7 +669,7 @@ namespace WindowsFormsApp2
                 return false; // Keep scrolling if the element is not found
             }
         }
-        private void InsertRowIntoDatatable((string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite) dataTobeAdded, bool skipTempRow = false)
+        private void InsertRowIntoDatatable(BusinessInfo dataTobeAdded, bool skipTempRow = false)
         {
             if(!skipTempRow) tempRows.Add(dataTobeAdded);
             if (skipTempRow)
@@ -1035,7 +1097,7 @@ namespace WindowsFormsApp2
         }
 
 
-        private void ExportToExcel(List<(string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string streetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string hrefValue)> results)
+        private void ExportToExcel(List<BusinessInfo> results)
         {
             if (results == null)
             {
@@ -1166,22 +1228,22 @@ namespace WindowsFormsApp2
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Street_Address") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].streetAddress;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].StreetAddress;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "City") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].city;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].City;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Zip") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].zip;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].Zip;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Country") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].country;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].Country;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Contact Number") != null)
@@ -1191,42 +1253,42 @@ namespace WindowsFormsApp2
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Email") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("emails") ? results[i].socialMedias["emails"] : string.Empty;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].SocialMedias.ContainsKey("emails") ? results[i].SocialMedias["emails"] : string.Empty;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Website") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].hrefValue;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].CompanyWebsite;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Facebook") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("facebook") ? results[i].socialMedias["facebook"] : string.Empty;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].SocialMedias.ContainsKey("facebook") ? results[i].SocialMedias["facebook"] : string.Empty;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Linkedin") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("linkedin") ? results[i].socialMedias["linkedin"] : string.Empty;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].SocialMedias.ContainsKey("linkedin") ? results[i].SocialMedias["linkedin"] : string.Empty;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Twitter") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("x") ? results[i].socialMedias["x"] : string.Empty;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].SocialMedias.ContainsKey("x") ? results[i].SocialMedias["x"] : string.Empty;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Youtube") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("youtube") ? results[i].socialMedias["youtube"] : string.Empty;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].SocialMedias.ContainsKey("youtube") ? results[i].SocialMedias["youtube"] : string.Empty;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Instagram") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("instagram") ? results[i].socialMedias["instagram"] : string.Empty;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].SocialMedias.ContainsKey("instagram") ? results[i].SocialMedias["instagram"] : string.Empty;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Pinterest") != null)
                             {
-                                worksheet.Cell(i + 2, columnIndex).Value = results[i].socialMedias.ContainsKey("pinterest") ? results[i].socialMedias["pinterest"] : string.Empty;
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].SocialMedias.ContainsKey("pinterest") ? results[i].SocialMedias["pinterest"] : string.Empty;
                                 columnIndex++;
                             }
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Rating") != null)
@@ -1237,6 +1299,55 @@ namespace WindowsFormsApp2
                             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Review Count") != null)
                             {
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].ReviewCount;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Claim") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].Claim;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Hours_Info") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].HoursInfo;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Monday") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Monday") ? results[i].BusinessHours["Monday"] : string.Empty;
+                                columnIndex++;
+                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Tuesday") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Tuesday") ? results[i].BusinessHours["Monday"] : string.Empty;
+                                columnIndex++;
+                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Wednesday") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Wednesday") ? results[i].BusinessHours["Wednesday"] : string.Empty;
+                                columnIndex++;
+                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Thursday") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Thursday") ? results[i].BusinessHours["Thursday"] : string.Empty;
+                                columnIndex++;
+                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Friday") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Friday") ? results[i].BusinessHours["Friday"] : string.Empty;
+                                columnIndex++;
+                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Saturday") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Saturday") ? results[i].BusinessHours["Saturday"] : string.Empty;
+                                columnIndex++;
+                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Sunday") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Sunday") ? results[i].BusinessHours["Sunday"] : string.Empty;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Located_in") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].LocatedIn;
+                                columnIndex++;
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Attributes") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].Attributes;
                                 columnIndex++;
                             }
                             worksheet.Cell(i + 2, columnIndex).Value = formattedDate;
@@ -1294,8 +1405,36 @@ namespace WindowsFormsApp2
             }
         }
 
+        public Dictionary<string, string> ConvertBusinessHours(string input)
+        {
+            Dictionary<string, string> hoursDict = new Dictionary<string, string>();
 
-        private Object[] updateGridList((string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite) result)
+            // ✅ Regular expression to match each day and time range
+            string pattern = @"(\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b),\s*([^;]+)";
+            MatchCollection matches = Regex.Matches(input, pattern);
+
+            foreach (Match match in matches)
+            {
+                string day = match.Groups[1].Value.Trim();
+                string timeRange = match.Groups[2].Value.Trim();
+
+                // ✅ If the business is "Closed", keep it as "Closed"
+                if (timeRange.Equals("Closed", StringComparison.OrdinalIgnoreCase))
+                {
+                    hoursDict[day] = "Closed";
+                }
+                else
+                {
+                    // ✅ Convert original time range to "10 AM–3 AM"
+                    hoursDict[day] = "10 AM–3 AM";
+                }
+            }
+
+            return hoursDict;
+        }
+
+
+        private Object[] updateGridList(BusinessInfo result)
         {
             dataColumns = new List<string>();
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "#") != null)
@@ -1324,15 +1463,15 @@ namespace WindowsFormsApp2
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "City") != null)
             {
-                dataColumns.Add(result.city);
+                dataColumns.Add(result.City);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Zip") != null)
             {
-                dataColumns.Add(result.zip);
+                dataColumns.Add(result.Zip);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Country") != null)
             {
-                dataColumns.Add(result.country);
+                dataColumns.Add(result.Country);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Contact Number") != null)
             {
@@ -1340,35 +1479,35 @@ namespace WindowsFormsApp2
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Email") != null)
             {
-                dataColumns.Add(result.socialMedias.ContainsKey("emails") ? result.socialMedias["emails"] : string.Empty);
+                dataColumns.Add(result.SocialMedias.ContainsKey("emails") ? result.SocialMedias["emails"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Website") != null)
             {
-                dataColumns.Add(result.companyWebsite);
+                dataColumns.Add(result.CompanyWebsite);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Facebook") != null)
             {
-                dataColumns.Add(result.socialMedias.ContainsKey("facebook") ? result.socialMedias["facebook"] : string.Empty);
+                dataColumns.Add(result.SocialMedias.ContainsKey("facebook") ? result.SocialMedias["facebook"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Linkedin") != null)
-            {
-                dataColumns.Add(result.socialMedias.ContainsKey("linkedin") ? result.socialMedias["linkedin"] : string.Empty);
+            {           
+                dataColumns.Add(result.SocialMedias.ContainsKey("linkedin") ? result.SocialMedias["linkedin"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Twitter") != null)
             {
-                dataColumns.Add(result.socialMedias.ContainsKey("x") ? result.socialMedias["x"] : string.Empty);
+                dataColumns.Add(result.SocialMedias.ContainsKey("x") ? result.SocialMedias["x"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Youtube") != null)
             {
-                dataColumns.Add(result.socialMedias.ContainsKey("youtube") ? result.socialMedias["youtube"] : string.Empty);
+                dataColumns.Add(result.SocialMedias.ContainsKey("youtube") ? result.SocialMedias["youtube"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Instagram") != null)
             {
-                dataColumns.Add(result.socialMedias.ContainsKey("instagram") ? result.socialMedias["instagram"] : string.Empty);
+                dataColumns.Add(result.SocialMedias.ContainsKey("instagram") ? result.SocialMedias["instagram"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Pinterest") != null)
             {
-                dataColumns.Add(result.socialMedias.ContainsKey("pinterest") ? result.socialMedias["pinterest"] : string.Empty);
+                dataColumns.Add(result.SocialMedias.ContainsKey("pinterest") ? result.SocialMedias["pinterest"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Rating") != null)
             {
@@ -1377,6 +1516,44 @@ namespace WindowsFormsApp2
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Review Count") != null)
             {
                 dataColumns.Add(result.ReviewCount);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Claim") != null)
+            {
+                dataColumns.Add(result.Claim.ToString());
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Hours_Info") != null)
+            {
+                dataColumns.Add(result.HoursInfo);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Monday") != null)
+            {
+                dataColumns.Add(result.BusinessHours.ContainsKey("Monday") ? result.BusinessHours["Monday"] : string.Empty);
+            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Tuesday") != null)
+            {
+                dataColumns.Add(result.BusinessHours.ContainsKey("Tuesday") ? result.BusinessHours["Tuesday"] : string.Empty);
+            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Wednesday") != null)
+            {
+                dataColumns.Add(result.BusinessHours.ContainsKey("Wednesday") ? result.BusinessHours["Wednesday"] : string.Empty);
+            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Thursday") != null)
+            {
+                dataColumns.Add(result.BusinessHours.ContainsKey("Thursday") ? result.BusinessHours["Thursday"] : string.Empty);
+            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Friday") != null)
+            {
+                dataColumns.Add(result.BusinessHours.ContainsKey("Friday") ? result.BusinessHours["Friday"] : string.Empty);
+            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Saturday") != null)
+            {
+                dataColumns.Add(result.BusinessHours.ContainsKey("Saturday") ? result.BusinessHours["Saturday"] : string.Empty);
+            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Sunday") != null)
+            {
+                dataColumns.Add(result.BusinessHours.ContainsKey("Sunday") ? result.BusinessHours["Sunday"] : string.Empty);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Located_in") != null)
+            {
+                dataColumns.Add(result.LocatedIn);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Attributes") != null)
+            {
+                dataColumns.Add(result.Attributes);
             }
 
             return dataColumns.ToArray();
