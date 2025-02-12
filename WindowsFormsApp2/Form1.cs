@@ -180,7 +180,7 @@ namespace WindowsFormsApp2
                         //lblStatus.Text = "Crawling stopped.";
                         break;
                     }
-                    if (count > 11)
+                    if (count > 10)
                     {
                         count = 0;
                         driver.Quit();
@@ -391,17 +391,25 @@ namespace WindowsFormsApp2
                                 }
                             }
                             clickableElement[i].Click();
+                            //Thread.Sleep(30);
                             WebDriverWait newWait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
 
                             // ✅ Wait until the div with the required class is visible
-                            IWebElement sidebar = newWait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@role='main' and contains(@class, 'm6QErb')]")));
+                            IWebElement sidebar = newWait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']")));
 
                             //Console.WriteLine("✅ Business details sidebar detected.");
                             //Thread.Sleep(100);
                             i++;
                             var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
-                            var hrefItem = detailsElems[0].FindElement(By.CssSelector("a[data-item-id='authority']"));
-                            hrefValue = hrefItem.GetAttribute("href");
+                            IWebElement hrefItem = null;
+                            try
+                            {
+                                hrefItem = detailsElems[0].FindElement(By.CssSelector("a[data-item-id='authority']"));
+                            } catch(Exception exc)
+                            {
+                                hrefItem = null;
+                            }
+                            hrefValue = hrefItem == null ? string.Empty : hrefItem.GetAttribute("href");
                             string contactNumber = string.Empty;
                             try
                             {
@@ -507,6 +515,10 @@ namespace WindowsFormsApp2
                             results.Add(dataTobeAdded);
                             //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
                             InsertRowIntoDatatable(dataTobeAdded);
+                            var closeButton = detailsElems[0].FindElement(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]"));
+                            //IWebElement closeButton = wait.Until(ExpectedConditions.ElementToBeClickable(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]")));
+                            closeButton.Click();
+
                             //UpdateProgress("data extract finished"+" -360");
                             //driver.Navigate().Back();
                             //driver.Navigate().Back();
@@ -601,7 +613,11 @@ namespace WindowsFormsApp2
             if (skipTempRow)
             {
                 var rowToBeAdded = updateGridList(dataTobeAdded);
-                dataGridView.Rows.Add(rowToBeAdded);
+                Invoke(new Action(() =>
+                {
+                    dataGridView.Rows.Add(rowToBeAdded);
+                }));
+                
                 return;
             }
             if(tempRows.Count >= 10 || dataGridView.RowCount == 0)
