@@ -388,6 +388,8 @@ namespace WindowsFormsApp2
                             ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
                             var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
                             string category = string.Empty;
+                            string mapLink = driver.Url;
+
                             if (elements != null)
                             {
                                 category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
@@ -572,7 +574,7 @@ namespace WindowsFormsApp2
                                 term, title, reviewCount, rating, contactNumber, 
                                 category, location, streetLocation, city, zip, 
                                 country, keyValuePairs, hrefValue, claim, hourInfo,
-                                businessHours, locateInText, attributes
+                                businessHours, locateInText, attributes, mapLink
                             );
                             results.Add(dataTobeAdded);
                             //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
@@ -925,7 +927,7 @@ namespace WindowsFormsApp2
                     var emails = ExtractEmails(pageSource);
 
                     // Combine all emails into one string (comma-separated)
-                    if (emails.Count > 0)
+                    if (emails.Count > 0 && emails.Count <= 4)
                     {
                         string combinedEmails = string.Join(", ", emails);
                         socialLinks["emails"] = combinedEmails; // Single key for all emails
@@ -956,17 +958,25 @@ namespace WindowsFormsApp2
             return socialLinks;
         }
 
+
+
         public static List<string> ExtractEmails(string pageSource)
         {
             List<string> emailList = new List<string>();
 
             // ✅ Regex pattern for extracting emails
-            string pattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}";
+            //string pattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}";
+            string pattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?=\s|$|[?&])";
+            //string pattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(?!\d+x\d*\.(?:png|jpg|jpeg|gif|svg|webp))[a-zA-Z]{2,}(?=\s|$|[?&])";
+            //string pattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(?!\d+x\d*\.)[a-zA-Z]{2,}(?=\s|$|[?&])";
+            //string pattern = @"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(?!\d+x\d+\.(?:png|jpg|jpeg|gif|svg|webp|bmp|tiff|ico|jfif))[a-zA-Z]{2,}\b";
 
+            //string pattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(?!\d+x\.(?:png|jpg|jpeg|gif|svg|webp))[a-zA-Z]{2,}";
+            //string hrefPattern = @"<a\s+[^>]*href\s*=\s*""([^""]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})""";
             MatchCollection matches = Regex.Matches(pageSource, pattern);
             foreach (Match match in matches)
             {
-                if (!emailList.Contains(match.Value))
+                if (match.Value != null && match.Value.Length <= 30 && !emailList.Contains(match.Value))
                 {
                     emailList.Add(match.Value); // Avoid duplicates
                 }
@@ -1350,6 +1360,11 @@ namespace WindowsFormsApp2
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].Attributes;
                                 columnIndex++;
                             }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Map_Link") != null)
+                            {
+                                worksheet.Cell(i + 2, columnIndex).Value = results[i].MapLink;
+                                columnIndex++;
+                            }
                             worksheet.Cell(i + 2, columnIndex).Value = formattedDate;
                             columnIndex++;
 
@@ -1554,6 +1569,10 @@ namespace WindowsFormsApp2
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Attributes") != null)
             {
                 dataColumns.Add(result.Attributes);
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Map_Link") != null)
+            {
+                dataColumns.Add(result.MapLink);
             }
 
             return dataColumns.ToArray();

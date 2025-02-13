@@ -26,11 +26,12 @@ namespace WindowsFormsApp2
         public Dictionary<string, string> BusinessHours { get; set; }
         public string LocatedIn { get; set; }
         public string Attributes { get; set; }
+        public string MapLink { get; set; }
 
         public BusinessInfo(string searchTerm, string resultTitle, string reviewCount, string rating, string contactNumber,
                         string category, string address, string streetAddress, string city, string zip, string country,
                         Dictionary<string, string> socialMedias, string companyWebsite, bool claim, string hoursInfo,
-                        Dictionary<string, string> businessHours, string locatedIn, string attributes)
+                        Dictionary<string, string> businessHours, string locatedIn, string attributes, string mapLink)
         {
             SearchTerm = searchTerm;
             ResultTitle = resultTitle;
@@ -50,6 +51,7 @@ namespace WindowsFormsApp2
             BusinessHours = businessHours;
             LocatedIn = locatedIn;
             Attributes = attributes;
+            MapLink = mapLink;
         }
     }
 

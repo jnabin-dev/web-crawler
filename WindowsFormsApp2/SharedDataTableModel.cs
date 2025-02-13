@@ -41,6 +41,7 @@ namespace WindowsFormsApp2
                 new GridColumnConfig("Sunday", null),
                 new GridColumnConfig("Located_in", null),
                 new GridColumnConfig("Attributes", null),
+                new GridColumnConfig("Map_Link", null),
             };
 
         public SharedDataTableModel()
