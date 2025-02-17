@@ -172,7 +172,7 @@ namespace WindowsFormsApp2
             try
             {
                 //uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
-                new DriverManager().SetUpDriver(new ChromeConfig(), VersionResolveStrategy.MatchingBrowser); // Automatically downloads ChromeDriver
+                //new DriverManager().SetUpDriver(new ChromeConfig(), VersionResolveStrategy.MatchingBrowser); // Automatically downloads ChromeDriver
                 driver = RestartPrimaryWebDriver();
                 chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
                 driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
@@ -186,7 +186,7 @@ namespace WindowsFormsApp2
                         //lblStatus.Text = "Crawling stopped.";
                         break;
                     }
-                    if (count > 10)
+                    if (count > 9)
                     {
                         count = 0;
                         driver.Quit();
@@ -421,12 +421,13 @@ namespace WindowsFormsApp2
                             string contactNumber = string.Empty;
                             try
                             {
-                                contactNumber = resultElement.FindElement(By.ClassName("UsdlK")).Text;
+                                var item = detailsElems[0].FindElement(By.CssSelector("button[data-tooltip='Copy phone number'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc "));
+                                contactNumber = item != null ? item.Text : string.Empty;
                             }
                             catch (Exception ex)
                             {
                                 //UpdateProgress(ex.Message + "-267");
-                                LoggerService.Error("Crawling error - 312", ex);
+                                LoggerService.Error("number extract error - 312", ex);
                             }
                             string hourInfo = string.Empty;
                             try
@@ -1063,25 +1064,42 @@ namespace WindowsFormsApp2
 
         private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer, HashSet<string> processedResults, IJavaScriptExecutor jsExecutor)
         {
-            //ValidateDriverSession(driver, jsExecutor);
             bool hasMoreResults = true;
-            int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-            var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-            List<string> t = newElements.Select(x =>
+            try
             {
-                string txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
-                if (!processedResults.Contains(txt))
+                int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
+                List<string> t = newElements.Select(x =>
                 {
-                    return txt;
-                }
-                else
-                {
-                    return string.Empty;
-                }
+                    string txt = string.Empty;
+                    try
+                    {
+                        txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
+                    }
+                    catch (Exception ex)
+                    {
+                        LoggerService.Error("scrool to load more", ex);
+                    }
+                    if (!processedResults.Contains(txt))
+                    {
+                        return txt;
+                    }
+                    else
+                    {
+                        return string.Empty;
+                    }
 
-            }).ToList();
-            t = t.Where(x => x.Length > 0).ToList();
-            hasMoreResults = t.Count != 0;
+                }).ToList();
+                t = t.Where(x => x.Length > 0).ToList();
+                hasMoreResults = t.Count != 0;
+
+            } catch(Exception exc)
+            {
+                hasMoreResults = false;
+                LoggerService.Error("Error on has more results", exc);
+            }
+            //ValidateDriverSession(driver, jsExecutor);
+            
 
             return hasMoreResults;
         }
