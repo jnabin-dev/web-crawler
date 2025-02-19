@@ -21,6 +21,8 @@ using System.Text;
 using WebDriverManager.Helpers;
 using System.Diagnostics;
 using System.Reflection;
+using OpenQA.Selenium.Interactions;
+using DocumentFormat.OpenXml.Wordprocessing;
 
 namespace WindowsFormsApp2
 {
@@ -29,7 +31,7 @@ namespace WindowsFormsApp2
         List<string> dataColumns = new List<string>();
         //Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)> uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
         private string[] searchTerms;
-        private Font mulishRegularFont;
+        //private Font mulishRegularFont;
         private IWebDriver driver;
         private IWebDriver chromeDriverForBusinessData;
         private int driverProcessId;
@@ -174,6 +176,7 @@ namespace WindowsFormsApp2
                 //uniqueDataPair = new Dictionary<string, (string SearchTerm, string ResultTitle, string ReviewCount, string Rating, string ContactNumber, string Category, string Address, string StreetAddress, string city, string zip, string country, Dictionary<string, string> socialMedias, string companyWebsite)>();
                 //new DriverManager().SetUpDriver(new ChromeConfig(), VersionResolveStrategy.MatchingBrowser); // Automatically downloads ChromeDriver
                 driver = RestartPrimaryWebDriver();
+                //driverActions = new Actions(driver);
                 chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
                 driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
                 int count = 0;
@@ -200,6 +203,7 @@ namespace WindowsFormsApp2
                         LoggerService.Info("Driver closed.");
                         LoggerService.Info("New driver creating for primary data, 167");
                         driver = RestartPrimaryWebDriver();
+                        //driverActions = new Actions(driver);
                         chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
                         LoggerService.Info("New driver creating for business data, 189");
                         driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
@@ -221,10 +225,10 @@ namespace WindowsFormsApp2
                 {
                     animatedLoader.Visible = false;
                 }));
-                driver.Quit();
-                driver.Dispose();
-                driver = null;
-                KillChromeDriverProcess(driverProcessId);
+                //driver.Quit();
+                //driver.Dispose();
+                //driver = null;
+                //KillChromeDriverProcess(driverProcessId);
                 chromeDriverForBusinessData.Quit();
                 chromeDriverForBusinessData.Dispose();
                 chromeDriverForBusinessData = null;
@@ -333,12 +337,28 @@ namespace WindowsFormsApp2
             searchBox.SendKeys(term);
             searchBox.SendKeys(Keys.Enter);
             // Wait for the search box to load
-            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(20));
+            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(40));
             try
             {
+                IWebElement mapContainer = null;
                 // Example: Wait for the search results container to be visible
                 wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"))); // Adjust selector based on target element
-                var mapContainer = driver.FindElement(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
+                var mapContainers = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
+                if(mapContainers.Count > 0)
+                {
+                    mapContainer = mapContainers[0];
+                } else
+                {
+                    Thread.Sleep(30);
+                    mapContainers = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
+                    if (mapContainers.Count > 0)
+                    {
+                        mapContainer = mapContainers[0];
+                    } else
+                    {
+                        return;
+                    }
+                }
                 var processedResults = new HashSet<string>();
                 bool hasMoreResults = true;
                 IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
@@ -367,7 +387,8 @@ namespace WindowsFormsApp2
                         {
                             string reviewCount = string.Empty;
                             string rating = string.Empty;
-                            string title = resultElement.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
+                            var titleElements = resultElement.FindElements(By.CssSelector(".qBF1Pd.fontHeadlineSmall"));
+                            string title = titleElements.Count > 0 ? titleElements[0].Text : string.Empty;
                             if (processedResults.Contains(title))
                             {
                                 i++;
@@ -379,13 +400,28 @@ namespace WindowsFormsApp2
                             string hrefValue = string.Empty;
 
                             processedResults.Add(title);
-                            var clickableElement = driver.FindElements(By.CssSelector("a.hfpxzc"));
+                            string safeTitle = title.Replace("'", "', \"'\", '"); // Replaces ' with XPath-compatible concat format
+                            var clickableElement = driver.FindElement(By.XPath($"//a[@aria-label='{safeTitle}' and contains(@class, 'hfpxzc')]"));
+                            //driver.FindElement(By.XPath("//a[@aria-label='Your Label Text' and contains(@class, 'your-class-name')]"));
+                            //driver.FindElement(By.XPath("//*[@aria-label='Your Label Text' and contains(@class, 'your-class-name')]"));
+                            //driver.FindElement(By.XPath($"//a[@aria-label='{title}' and contains(@class, 'hfpxzc')]"));
+                            //var clickableElement = clickableElements.
                             // ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
-                            int height = clickableElement[i].Size.Height;
+                            int height = clickableElement.Size.Height;
 
-                            lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                            //lastHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                             jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
-                            ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement[i]);
+                            //Thread.Sleep(500);
+                            ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement);
+                            WebDriverWait wait2 = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                            IWebElement element = wait.Until(ExpectedConditions.ElementToBeClickable(clickableElement));
+                            WebDriverWait newWait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                            //Thread.Sleep(500);
+                            clickableElement.Click();
+                            //((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].click();", clickableElement);
+                            //Thread.Sleep(30);
+                            // ✅ Wait until the div with the required class is visible
+                            IWebElement sidebar = newWait.Until(ExpectedConditions.ElementIsVisible(By.XPath($"//div[contains(@class, 'm6QErb') and contains(@class, 'WNBkOb') and contains(@class, 'XiKgde') and @aria-label='{safeTitle}']")));
                             var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
                             string category = string.Empty;
                             string mapLink = driver.Url;
@@ -398,21 +434,16 @@ namespace WindowsFormsApp2
                                     category = category.Split('·')[0];
                                 }
                             }
-                            clickableElement[i].Click();
-                            //Thread.Sleep(30);
-                            WebDriverWait newWait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
-
-                            // ✅ Wait until the div with the required class is visible
-                            IWebElement sidebar = newWait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']")));
 
                             //Console.WriteLine("✅ Business details sidebar detected.");
                             //Thread.Sleep(100);
                             i++;
-                            var detailsElems = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ']"));
+                            var detailsElems = driver.FindElements(By.XPath($"//div[contains(@class, 'm6QErb') and contains(@class, 'WNBkOb') and contains(@class, 'XiKgde') and @aria-label='{safeTitle}']"));
                             IWebElement hrefItem = null;
                             try
                             {
-                                hrefItem = detailsElems[0].FindElement(By.CssSelector("a[data-item-id='authority']"));
+                                var hItems = detailsElems[0].FindElements(By.CssSelector("a[data-item-id='authority']"));
+                                hrefItem = hItems.Count > 0 ? hItems[0] : null;
                             } catch(Exception exc)
                             {
                                 hrefItem = null;
@@ -421,8 +452,8 @@ namespace WindowsFormsApp2
                             string contactNumber = string.Empty;
                             try
                             {
-                                var item = detailsElems[0].FindElement(By.CssSelector("button[data-tooltip='Copy phone number'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc "));
-                                contactNumber = item != null ? item.Text : string.Empty;
+                                var item = detailsElems[0].FindElements(By.CssSelector("button[data-tooltip='Copy phone number'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc "));
+                                contactNumber = item.Count > 0 ? item[0].Text : string.Empty;
                             }
                             catch (Exception ex)
                             {
@@ -432,8 +463,8 @@ namespace WindowsFormsApp2
                             string hourInfo = string.Empty;
                             try
                             {
-                                var hourInfoElement = detailsElems[0].FindElement(By.CssSelector(".t39EBf.GUrTXd"));
-                                hourInfo = hourInfoElement != null ? hourInfoElement.GetAttribute("aria-label") : string.Empty;
+                                var hourInfoElement = detailsElems[0].FindElements(By.CssSelector(".t39EBf.GUrTXd"));
+                                hourInfo = hourInfoElement.Count > 0 ? hourInfoElement[0].GetAttribute("aria-label") : string.Empty;
                             } catch(Exception exc)
                             {
                                 LoggerService.Error("invalid hour info", exc);
@@ -500,8 +531,8 @@ namespace WindowsFormsApp2
                             //string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
                             try
                             {
-                                var item = detailsElems[0].FindElement(By.CssSelector("button[data-item-id='address'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc"));
-                                location = item != null ? item.Text : string.Empty;
+                                var item = detailsElems[0].FindElements(By.CssSelector("button[data-item-id='address'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc"));
+                                location = item.Count > 0 ? item[0].Text : string.Empty;
                                 //var regex = new Regex(pattern);
                                 var addressObj = ParseAddress(location);
                                 streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
@@ -537,16 +568,16 @@ namespace WindowsFormsApp2
                             //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
                             try
                             {
-                                var checkClaim = detailsElems[0].FindElement(By.CssSelector("a[data-item-id='merchant']"));
-                                claim = checkClaim != null && checkClaim.GetAttribute("href") != null;
+                                var checkClaim = detailsElems[0].FindElements(By.CssSelector("a[data-item-id='merchant']"));
+                                claim = checkClaim.Count > 0 && checkClaim[0].GetAttribute("href") != null;
                             }
                             catch (Exception ex) { 
                                 claim = false;
                             }
                             try
                             {
-                                var locateIn = detailsElems[0].FindElement(By.CssSelector("button[data-item-id='locatedin']"));
-                                locateInText = locateIn != null ? locateIn.GetAttribute("aria-label") : string.Empty;
+                                var locateIn = detailsElems[0].FindElements(By.CssSelector("button[data-item-id='locatedin']"));
+                                locateInText = locateIn.Count > 0 ? locateIn[0].GetAttribute("aria-label") : string.Empty;
                             }
                             catch (Exception ex)
                             {
@@ -580,9 +611,16 @@ namespace WindowsFormsApp2
                             results.Add(dataTobeAdded);
                             //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
                             InsertRowIntoDatatable(dataTobeAdded);
-                            var closeButton = detailsElems[0].FindElement(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]"));
+                            var closeButtons = detailsElems[0].FindElements(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]"));
+                            var closeButton = closeButtons.Count > 0 ? closeButtons[0] : null;
                             //IWebElement closeButton = wait.Until(ExpectedConditions.ElementToBeClickable(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]")));
-                            closeButton.Click();
+                            if(closeButton != null)
+                            {
+                                closeButton.Click();
+                            } else
+                            {
+                                Thread.Sleep(30);
+                            }
 
                             //UpdateProgress("data extract finished"+" -360");
                             //driver.Navigate().Back();
@@ -598,7 +636,7 @@ namespace WindowsFormsApp2
                         }
                     }
                     //IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-                    WebDriverWait scrollWait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+                    WebDriverWait scrollWait = new WebDriverWait(driver, TimeSpan.FromSeconds(20));
                     if (!IsEndOfScroll(driver))
                     {
                         scrollWait.Until(driver2 =>
@@ -661,10 +699,10 @@ namespace WindowsFormsApp2
             try
             {
                 // Locate the specific div with classes "m6QErb XiKgde tLjsW eKbjU"
-                IWebElement endMessageContainer = driver.FindElement(By.CssSelector("div.m6QErb.XiKgde.tLjsW.eKbjU"));
-
+                var endMessageContainers = driver.FindElements(By.CssSelector("div.m6QErb.XiKgde.tLjsW.eKbjU"));
+                var endMessageContainer = endMessageContainers.Count > 0 ? endMessageContainers[0] : null;  
                 // Check if it contains the "You've reached the end of the list." text
-                return endMessageContainer.Text.Contains("You've reached the end of the list.");
+                return endMessageContainer != null && endMessageContainer.Text.Contains("You've reached the end of the list.");
             }
             catch (Exception ex)
             {
@@ -1067,14 +1105,15 @@ namespace WindowsFormsApp2
             bool hasMoreResults = true;
             try
             {
-                int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                //int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
                 var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
                 List<string> t = newElements.Select(x =>
                 {
                     string txt = string.Empty;
                     try
                     {
-                        txt = x.FindElement(By.CssSelector(".qBF1Pd.fontHeadlineSmall")).Text;
+                        var txtItems = x.FindElements(By.CssSelector(".qBF1Pd.fontHeadlineSmall"));
+                        txt = txtItems.Count > 0 ? txtItems[0].Text : string.Empty;
                     }
                     catch (Exception ex)
                     {
