@@ -157,9 +157,7 @@ namespace WindowsFormsApp2
             this.instructionsTextBox.ReadOnly = true;
             this.instructionsTextBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
             this.instructionsTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.instructionsTextBox.Text = "The bot will open a Chrome window...\r\n" + // Add your instructions here
-                                        "* FREE version only extracts 20 results...\r\n" +
-                                        "* Make sure language is set to English...";
+            this.instructionsTextBox.Text = initialInstructionText;
 
             // 
             // progressGroupBox

@@ -23,6 +23,7 @@ using System.Diagnostics;
 using System.Reflection;
 using OpenQA.Selenium.Interactions;
 using DocumentFormat.OpenXml.Wordprocessing;
+using DocumentFormat.OpenXml.Presentation;
 
 namespace WindowsFormsApp2
 {
@@ -43,6 +44,12 @@ namespace WindowsFormsApp2
         private int businessDriverProcessId;
         private List<BusinessInfo> tempRows = new List<BusinessInfo>();
         private int batchSize = 35;
+        private string initialInstructionText = "The bot will open a Chrome window...\r\n" +
+                                        "* FREE version only extracts 20 results...\r\n" +
+                                        "* Make sure language is set to English...\r\n" +
+                                        "\r\n" +
+                                        "Search Terms - \r\n" +
+                                        "------------------------ \r\n";
         private static readonly HashSet<string> CountryList = new HashSet<string>
         {
             "Germany", "Australia", "United States", "USA", "Canada", "France", "Spain",
@@ -135,12 +142,13 @@ namespace WindowsFormsApp2
         {
             ExportToExcel(results);
         }
-        
+
         private void clearDataButton_Click(object sender, EventArgs e)
         {
             dataGridView.Rows.Clear();
             LoggerService.Info("Clearing data.");
             UpdateProgress("", true);
+            UpdateCurrentSearchTerms("", true);
         }
 
         private IWebDriver RestartPrimaryWebDriver()
@@ -178,10 +186,13 @@ namespace WindowsFormsApp2
                 driver = RestartPrimaryWebDriver();
                 //driverActions = new Actions(driver);
                 chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
-                driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
                 int count = 0;
-                foreach (string term in searchTerms)
+                for (int termIndex = 0; termIndex < searchTerms.Length; termIndex++)
                 {
+                    string term = searchTerms[termIndex];
+                    UpdateCurrentSearchTerms($"Line Number: {termIndex+1}, Term: {term}");
+                    //driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
+                    driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en");
                     LoggerService.Info(term);
                     count++;
                     if (cancellationToken.IsCancellationRequested)
@@ -189,7 +200,7 @@ namespace WindowsFormsApp2
                         //lblStatus.Text = "Crawling stopped.";
                         break;
                     }
-                    if (count > 9)
+                    if (count > 11)
                     {
                         count = 0;
                         driver.Quit();
@@ -214,7 +225,8 @@ namespace WindowsFormsApp2
                         UpdateProgress($"Crawling: {term} - In progress");
                         await processCrawlingAsync(driver, chromeDriverForBusinessData, term, cancellationToken, fetchBusinessData);
                         UpdateProgress($"Crawling: {term} - Completed");
-                    } catch(Exception exc)
+                    }
+                    catch (Exception exc)
                     {
                         Console.WriteLine(exc.Message);
                         LoggerService.Error("Crawling error - 174", exc);
@@ -225,17 +237,17 @@ namespace WindowsFormsApp2
                 {
                     animatedLoader.Visible = false;
                 }));
-                //driver.Quit();
-                //driver.Dispose();
-                //driver = null;
-                //KillChromeDriverProcess(driverProcessId);
+                driver.Quit();
+                driver.Dispose();
+                driver = null;
+                KillChromeDriverProcess(driverProcessId);
                 chromeDriverForBusinessData.Quit();
                 chromeDriverForBusinessData.Dispose();
                 chromeDriverForBusinessData = null;
                 KillChromeDriverProcess(businessDriverProcessId);
                 // Export results to Excel
                 //ExportToExcel(results);
-                if(tempRows.Count > 0)
+                if (tempRows.Count > 0)
                 {
                     foreach (var row in tempRows)
                     {
@@ -259,7 +271,7 @@ namespace WindowsFormsApp2
 
         private void KillChromeDriverProcess(int processId)
         {
-            if (processId == 0 ) return;
+            if (processId == 0) return;
             try
             {
                 Process chromeDriverProcess = Process.GetProcessById(processId);
@@ -285,6 +297,16 @@ namespace WindowsFormsApp2
             progressTextBox.ScrollToCaret(); // Scroll to the caret
         }
 
+        private void AppendAndScrollInstructionBox(string message)
+        {
+            // Append the new message
+            instructionsTextBox.AppendText(message + "\r\n");
+
+            // Scroll to the bottom
+            instructionsTextBox.SelectionStart = progressTextBox.Text.Length; // Set the caret at the end
+            instructionsTextBox.ScrollToCaret(); // Scroll to the caret
+        }
+
         private void UpdateProgress(string message, bool empty = false)
         {
             if (progressTextBox.InvokeRequired)
@@ -292,10 +314,11 @@ namespace WindowsFormsApp2
                 // If called from a background thread, marshal to the UI thread
                 progressTextBox.Invoke(new Action(() =>
                 {
-                    if(empty)
+                    if (empty)
                     {
                         progressTextBox.Clear();
-                    } else
+                    }
+                    else
                     {
                         AppendAndScroll(message);
                     }
@@ -310,6 +333,36 @@ namespace WindowsFormsApp2
                 else
                 {
                     AppendAndScroll(message);
+                }
+            }
+        }
+
+        private void UpdateCurrentSearchTerms(string message, bool empty = false)
+        {
+            if (instructionsTextBox.InvokeRequired)
+            {
+                // If called from a background thread, marshal to the UI thread
+                instructionsTextBox.Invoke(new Action(() =>
+                {
+                    if (empty)
+                    {
+                        instructionsTextBox.Text = initialInstructionText;
+                    }
+                    else
+                    {
+                        AppendAndScrollInstructionBox(message);
+                    }
+                }));
+            }
+            else
+            {
+                if (empty)
+                {
+                    instructionsTextBox.Text = initialInstructionText;
+                }
+                else
+                {
+                    AppendAndScrollInstructionBox(message);
                 }
             }
         }
@@ -337,24 +390,26 @@ namespace WindowsFormsApp2
             searchBox.SendKeys(term);
             searchBox.SendKeys(Keys.Enter);
             // Wait for the search box to load
-            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(40));
+            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(20));
             try
             {
                 IWebElement mapContainer = null;
                 // Example: Wait for the search results container to be visible
                 wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"))); // Adjust selector based on target element
                 var mapContainers = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
-                if(mapContainers.Count > 0)
+                if (mapContainers.Count > 0)
                 {
                     mapContainer = mapContainers[0];
-                } else
+                }
+                else
                 {
                     Thread.Sleep(30);
                     mapContainers = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
                     if (mapContainers.Count > 0)
                     {
                         mapContainer = mapContainers[0];
-                    } else
+                    }
+                    else
                     {
                         return;
                     }
@@ -375,7 +430,20 @@ namespace WindowsFormsApp2
                     // Extract search results
 
                     var resultElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-                    int i = 0;
+                    try
+                    {
+                        var elements = driver.FindElements(By.XPath("//span[contains(@class, 'doJOZc')]"));
+                        foreach (var element in elements)
+                        {
+                            IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
+                            js.ExecuteScript("arguments[0].remove();", element);
+                        }
+                        Console.WriteLine("Element removed successfully.");
+                    }
+                    catch (NoSuchElementException)
+                    {
+                        Console.WriteLine("Element not found, skipping...");
+                    }
                     foreach (var resultElement in resultElements)
                     {
                         if (cancellationToken.IsCancellationRequested)
@@ -391,7 +459,6 @@ namespace WindowsFormsApp2
                             string title = titleElements.Count > 0 ? titleElements[0].Text : string.Empty;
                             if (processedResults.Contains(title))
                             {
-                                i++;
                                 continue; // Skip already processed results
                             }
                             //lcr4fd S9kvJb
@@ -401,7 +468,15 @@ namespace WindowsFormsApp2
 
                             processedResults.Add(title);
                             string safeTitle = title.Replace("'", "', \"'\", '"); // Replaces ' with XPath-compatible concat format
-                            var clickableElement = driver.FindElement(By.XPath($"//a[@aria-label='{safeTitle}' and contains(@class, 'hfpxzc')]"));
+                            IWebElement clickableElement = null;
+                            try
+                            {
+                                clickableElement = driver.FindElement(By.XPath($"//a[@aria-label='{safeTitle}' and contains(@class, 'hfpxzc')]"));
+                            } catch(Exception exc)
+                            {
+                                LoggerService.Error("clickable element not found");
+                                continue;
+                            }
                             //driver.FindElement(By.XPath("//a[@aria-label='Your Label Text' and contains(@class, 'your-class-name')]"));
                             //driver.FindElement(By.XPath("//*[@aria-label='Your Label Text' and contains(@class, 'your-class-name')]"));
                             //driver.FindElement(By.XPath($"//a[@aria-label='{title}' and contains(@class, 'hfpxzc')]"));
@@ -413,38 +488,94 @@ namespace WindowsFormsApp2
                             jsExecutor.ExecuteScript("arguments[0].scrollBy(0, arguments[1]);", mapContainer, height);
                             //Thread.Sleep(500);
                             ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", clickableElement);
-                            WebDriverWait wait2 = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
-                            IWebElement element = wait.Until(ExpectedConditions.ElementToBeClickable(clickableElement));
-                            WebDriverWait newWait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                            //WebDriverWait wait2 = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                            ///IWebElement element = wait.Until(ExpectedConditions.ElementToBeClickable(clickableElement));
+                            //new WebDriverWait(driver, 10).until(ExpectedConditions.invisibilityOfElementLocated(By.xpath("//div[@class='footer']")));
+                            //new WebDriverWait(getWebDriver(), 10).until(ExpectedConditions.elementToBeClickable(By.xpath("//label[@formcontrolname='reportingDealPermission' and @ng-reflect-name='reportingDealPermission']"))).click();
+                            try
+                            {
+                                //((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].click();", clickableElement);
+                                new WebDriverWait(driver, TimeSpan.FromSeconds(4)).Until(ExpectedConditions.ElementToBeClickable(clickableElement)).Click();
+                                //Thread.Sleep(10);
+                            }
+                            catch (ElementClickInterceptedException exc)
+                            {
+                                LoggerService.Error(title + " Not click able");
+
+                                //new WebDriverWait(driver, TimeSpan.FromSeconds(15)).Until(ExpectedConditions.InvisibilityOfElementLocated(
+                                //    By.XPath($"//a[@aria-label='{safeTitle}' and contains(@class, 'hfpxzc')]//span[contains(@class, 'doJOZc')]")
+                                //));
+                                //new WebDriverWait(driver, TimeSpan.FromSeconds(15)).Until(ExpectedConditions.ElementToBeClickable(clickableElement)).Click();
+                                Thread.Sleep(100);
+                                continue;
+                            }
                             //Thread.Sleep(500);
-                            clickableElement.Click();
+                            //clickableElement.Click();
                             //((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].click();", clickableElement);
                             //Thread.Sleep(30);
                             // ✅ Wait until the div with the required class is visible
-                            IWebElement sidebar = newWait.Until(ExpectedConditions.ElementIsVisible(By.XPath($"//div[contains(@class, 'm6QErb') and contains(@class, 'WNBkOb') and contains(@class, 'XiKgde') and @aria-label='{safeTitle}']")));
-                            var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
+                            IWebElement sidebar = null;
+                            try
+                            {
+                                sidebar = new WebDriverWait(driver, TimeSpan.FromSeconds(1.5)).Until(ExpectedConditions.ElementIsVisible(By.XPath($"//div[contains(@class, 'm6QErb') and contains(@class, 'WNBkOb') and contains(@class, 'XiKgde') and @aria-label='{safeTitle}']")));
+                            }
+                            catch (Exception exc)
+                            {
+                                LoggerService.Error("sidebar not opening, tite: " + title);
+                                Thread.Sleep(5);
+                                try
+                                {
+                                    new WebDriverWait(driver, TimeSpan.FromSeconds(2.5)).Until(ExpectedConditions.ElementToBeClickable(clickableElement)).Click();
+                                    sidebar = new WebDriverWait(driver, TimeSpan.FromSeconds(2)).Until(ExpectedConditions.ElementIsVisible(By.XPath($"//div[contains(@class, 'm6QErb') and contains(@class, 'WNBkOb') and contains(@class, 'XiKgde') and @aria-label='{safeTitle}']")));
+                                    Thread.Sleep(15);
+                                }
+                                catch (Exception exc2)
+                                {
+                                    LoggerService.Error(title+"--- re try sidebar, title" + title);
+                                    Thread.Sleep(100);
+                                    continue;
+                                }
+                            }
                             string category = string.Empty;
                             string mapLink = driver.Url;
 
-                            if (elements != null)
+                            try
                             {
-                                category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
-                                if (elements != null && category.Length > 0)
+                                var elements = resultElement.FindElements(By.CssSelector(".UaQhfb.fontBodyMedium > .W4Efsd")).Last();
+
+                                if (elements != null)
                                 {
-                                    category = category.Split('·')[0];
+                                    category = elements.FindElements(By.CssSelector(":first-child")).First().Text;
+                                    if (elements != null && category.Length > 0)
+                                    {
+                                        category = category.Split('·')[0];
+                                    }
                                 }
+                            } catch(Exception exc)
+                            {
+                                LoggerService.Error("Category fetch unsuccesful, title: "+title);
                             }
 
                             //Console.WriteLine("✅ Business details sidebar detected.");
                             //Thread.Sleep(100);
-                            i++;
-                            var detailsElems = driver.FindElements(By.XPath($"//div[contains(@class, 'm6QErb') and contains(@class, 'WNBkOb') and contains(@class, 'XiKgde') and @aria-label='{safeTitle}']"));
+                            IWebElement detailsElems = null;
+                            try 
+                            {
+                                detailsElems = new WebDriverWait(driver, TimeSpan.FromSeconds(2)).Until(ExpectedConditions.ElementIsVisible(By.XPath($"//div[contains(@class, 'm6QErb') and contains(@class, 'WNBkOb') and contains(@class, 'XiKgde') and @aria-label='{safeTitle}']")));
+                            } catch(Exception exc2)
+                            {
+                                LoggerService.Error("Details tab is not opened, title: " + title);
+                                Thread.Sleep(100);
+                                continue;
+                            }
+                            //var detailsElems = driver.FindElements(By.XPath($"//div[contains(@class, 'm6QErb') and contains(@class, 'WNBkOb') and contains(@class, 'XiKgde') and @aria-label='{safeTitle}']"));
                             IWebElement hrefItem = null;
                             try
                             {
-                                var hItems = detailsElems[0].FindElements(By.CssSelector("a[data-item-id='authority']"));
+                                var hItems = detailsElems.FindElements(By.CssSelector("a[data-item-id='authority']"));
                                 hrefItem = hItems.Count > 0 ? hItems[0] : null;
-                            } catch(Exception exc)
+                            }
+                            catch (Exception exc)
                             {
                                 hrefItem = null;
                             }
@@ -452,7 +583,7 @@ namespace WindowsFormsApp2
                             string contactNumber = string.Empty;
                             try
                             {
-                                var item = detailsElems[0].FindElements(By.CssSelector("button[data-tooltip='Copy phone number'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc "));
+                                var item = detailsElems.FindElements(By.CssSelector("button[data-tooltip='Copy phone number'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc "));
                                 contactNumber = item.Count > 0 ? item[0].Text : string.Empty;
                             }
                             catch (Exception ex)
@@ -463,9 +594,10 @@ namespace WindowsFormsApp2
                             string hourInfo = string.Empty;
                             try
                             {
-                                var hourInfoElement = detailsElems[0].FindElements(By.CssSelector(".t39EBf.GUrTXd"));
+                                var hourInfoElement = detailsElems.FindElements(By.CssSelector(".t39EBf.GUrTXd"));
                                 hourInfo = hourInfoElement.Count > 0 ? hourInfoElement[0].GetAttribute("aria-label") : string.Empty;
-                            } catch(Exception exc)
+                            }
+                            catch (Exception exc)
                             {
                                 LoggerService.Error("invalid hour info", exc);
                             }
@@ -487,7 +619,8 @@ namespace WindowsFormsApp2
                             //    Thread.Sleep(50);
                             //    continue;
                             //}
-                            try{
+                            try
+                            {
                                 if (fetchBusinessData && hrefValue.Length > 0 && !hrefValue.ToLower().Contains("facebook"))
                                 {
                                     hasUrl = true;
@@ -501,14 +634,23 @@ namespace WindowsFormsApp2
                                     //}
                                     //UpdateProgress("going to call setchsocialMediaLinks");
                                     var task = Task.Run(() => FetchSocialMediaLinks(hrefValue, webDriver));
-                                    keyValuePairs = await task;
+                                    if (task.Wait(TimeSpan.FromSeconds(10)))
+                                    {
+                                        keyValuePairs = task.Result;
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine("⏳ Timeout: Fetching social media links took too long.");
+                                    }
+                                    
                                 }
                                 else
                                 {
                                     hasUrl = false;
-                                    Thread.Sleep(10);
+                                    Thread.Sleep(50);
                                 }
-                            } catch (Exception ex)
+                            }
+                            catch (Exception ex)
                             {
                                 //UpdateProgress(ex.Message+"-303");
                                 LoggerService.Error("business data fetch error - 351", ex);
@@ -516,7 +658,16 @@ namespace WindowsFormsApp2
                                 Thread.Sleep(200);
                             }
                             //UpdateProgress("Processing other data after links");
-                            var reviewListText = GetRatingReview(resultElement.FindElement(By.ClassName("W4Efsd")).Text);
+                            List<string> reviewListText = new List<string>();
+                            try
+                            {
+                                var reviewElement = resultElement.FindElement(By.ClassName("W4Efsd"));
+                                reviewListText = GetRatingReview(reviewElement.Text);
+                            } catch(Exception exc)
+                            {
+                                LoggerService.Error("rating element not found");
+                            }
+
                             if (reviewListText != null && reviewListText.Count > 1)
                             {
                                 rating = reviewListText[0];
@@ -531,18 +682,18 @@ namespace WindowsFormsApp2
                             //string pattern = @"(?<street>[\d\s\w\W]+),\s(?<city>[A-Za-z\s]+)\s(?<state>[A-Za-z]+)\s(?<zip>\d{4}),\s(?<country>[A-Za-z\s]+)$";
                             try
                             {
-                                var item = detailsElems[0].FindElements(By.CssSelector("button[data-item-id='address'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc"));
+                                var item = detailsElems.FindElements(By.CssSelector("button[data-item-id='address'] .Io6YTe.fontBodyMedium.kR99db.fdkmkc"));
                                 location = item.Count > 0 ? item[0].Text : string.Empty;
                                 //var regex = new Regex(pattern);
                                 var addressObj = ParseAddress(location);
-                                streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                //streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
                                 city = addressObj.City;
                                 zip = addressObj.ZipCode;
                                 country = addressObj.Country;
-                                streetLocation = addressObj.Street; 
-                                if(streetLocation == string.Empty|| streetLocation == null)
+                                streetLocation = addressObj.Street;
+                                if (streetLocation == string.Empty || streetLocation == null)
                                 {
-                                    streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
+                                   // streetLocation = elements.FindElements(By.CssSelector(":nth-child(2)")).First().Text;
                                     if (streetLocation.Contains("Closed"))
                                     {
                                         streetLocation = "";
@@ -568,15 +719,16 @@ namespace WindowsFormsApp2
                             //string location = locationElems != null && locationElems.Count > 0 ? locationElems[0].Text : string.Empty;
                             try
                             {
-                                var checkClaim = detailsElems[0].FindElements(By.CssSelector("a[data-item-id='merchant']"));
+                                var checkClaim = detailsElems.FindElements(By.CssSelector("a[data-item-id='merchant']"));
                                 claim = checkClaim.Count > 0 && checkClaim[0].GetAttribute("href") != null;
                             }
-                            catch (Exception ex) { 
+                            catch (Exception ex)
+                            {
                                 claim = false;
                             }
                             try
                             {
-                                var locateIn = detailsElems[0].FindElements(By.CssSelector("button[data-item-id='locatedin']"));
+                                var locateIn = detailsElems.FindElements(By.CssSelector("button[data-item-id='locatedin']"));
                                 locateInText = locateIn.Count > 0 ? locateIn[0].GetAttribute("aria-label") : string.Empty;
                             }
                             catch (Exception ex)
@@ -586,13 +738,14 @@ namespace WindowsFormsApp2
                             string attributes = string.Empty;
                             try
                             {
-                                var attriElement = detailsElems[0].FindElements(By.CssSelector("div[data-item-id='place-info-links'] Io6YTe.fontBodyMedium.kR99db.fdkmkc "));
-                                foreach(var item in attriElement)
+                                var attriElement = detailsElems.FindElements(By.CssSelector("div[data-item-id='place-info-links'] Io6YTe.fontBodyMedium.kR99db.fdkmkc "));
+                                foreach (var item in attriElement)
                                 {
-                                    if(attributes.Length == 0)
+                                    if (attributes.Length == 0)
                                     {
                                         attributes = item.Text;
-                                    } else
+                                    }
+                                    else
                                     {
                                         attributes += $", {item.Text}";
                                     }
@@ -600,26 +753,23 @@ namespace WindowsFormsApp2
                             }
                             catch (Exception ex)
                             {
-                                
+
                             }
                             var dataTobeAdded = new BusinessInfo(
-                                term, title, reviewCount, rating, contactNumber, 
-                                category, location, streetLocation, city, zip, 
+                                term, title, reviewCount, rating, contactNumber,
+                                category, location, streetLocation, city, zip,
                                 country, keyValuePairs, hrefValue, claim, hourInfo,
                                 businessHours, locateInText, attributes, mapLink
                             );
                             results.Add(dataTobeAdded);
                             //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
                             InsertRowIntoDatatable(dataTobeAdded);
-                            var closeButtons = detailsElems[0].FindElements(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]"));
+                            var closeButtons = detailsElems.FindElements(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]"));
                             var closeButton = closeButtons.Count > 0 ? closeButtons[0] : null;
                             //IWebElement closeButton = wait.Until(ExpectedConditions.ElementToBeClickable(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]")));
-                            if(closeButton != null)
+                            if (closeButton != null)
                             {
                                 closeButton.Click();
-                            } else
-                            {
-                                Thread.Sleep(30);
                             }
 
                             //UpdateProgress("data extract finished"+" -360");
@@ -636,7 +786,7 @@ namespace WindowsFormsApp2
                         }
                     }
                     //IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-                    WebDriverWait scrollWait = new WebDriverWait(driver, TimeSpan.FromSeconds(20));
+                    WebDriverWait scrollWait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
                     if (!IsEndOfScroll(driver))
                     {
                         scrollWait.Until(driver2 =>
@@ -644,11 +794,12 @@ namespace WindowsFormsApp2
                             hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer, processedResults, jsExecutor);
                             return hasMoreResults;
                         });
-                    } else
+                    }
+                    else
                     {
                         hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer, processedResults, jsExecutor);
                     }
-                   
+
                     //if (!fetchBusinessData || !hasUrl)
                     //{
                     //    Thread.Sleep(2800);
@@ -684,7 +835,7 @@ namespace WindowsFormsApp2
                 driver = null;
                 KillChromeDriverProcess(driverProcessId);
             }
-            
+
             if (chromeDriverForBusinessData != null)
             {
                 chromeDriverForBusinessData.Quit();
@@ -700,7 +851,7 @@ namespace WindowsFormsApp2
             {
                 // Locate the specific div with classes "m6QErb XiKgde tLjsW eKbjU"
                 var endMessageContainers = driver.FindElements(By.CssSelector("div.m6QErb.XiKgde.tLjsW.eKbjU"));
-                var endMessageContainer = endMessageContainers.Count > 0 ? endMessageContainers[0] : null;  
+                var endMessageContainer = endMessageContainers.Count > 0 ? endMessageContainers[0] : null;
                 // Check if it contains the "You've reached the end of the list." text
                 return endMessageContainer != null && endMessageContainer.Text.Contains("You've reached the end of the list.");
             }
@@ -712,7 +863,7 @@ namespace WindowsFormsApp2
         }
         private void InsertRowIntoDatatable(BusinessInfo dataTobeAdded, bool skipTempRow = false)
         {
-            if(!skipTempRow) tempRows.Add(dataTobeAdded);
+            if (!skipTempRow) tempRows.Add(dataTobeAdded);
             if (skipTempRow)
             {
                 var rowToBeAdded = updateGridList(dataTobeAdded);
@@ -720,10 +871,10 @@ namespace WindowsFormsApp2
                 {
                     dataGridView.Rows.Add(rowToBeAdded);
                 }));
-                
+
                 return;
             }
-            if(tempRows.Count >= 10 || dataGridView.RowCount == 0)
+            if (tempRows.Count >= 10 || dataGridView.RowCount == 0)
             {
                 Invoke(new Action(() =>
 
@@ -1132,13 +1283,14 @@ namespace WindowsFormsApp2
                 t = t.Where(x => x.Length > 0).ToList();
                 hasMoreResults = t.Count != 0;
 
-            } catch(Exception exc)
+            }
+            catch (Exception exc)
             {
                 hasMoreResults = false;
                 LoggerService.Error("Error on has more results", exc);
             }
             //ValidateDriverSession(driver, jsExecutor);
-            
+
 
             return hasMoreResults;
         }
@@ -1382,27 +1534,33 @@ namespace WindowsFormsApp2
                             {
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Monday") ? results[i].BusinessHours["Monday"] : string.Empty;
                                 columnIndex++;
-                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Tuesday") != null)
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Tuesday") != null)
                             {
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Tuesday") ? results[i].BusinessHours["Monday"] : string.Empty;
                                 columnIndex++;
-                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Wednesday") != null)
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Wednesday") != null)
                             {
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Wednesday") ? results[i].BusinessHours["Wednesday"] : string.Empty;
                                 columnIndex++;
-                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Thursday") != null)
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Thursday") != null)
                             {
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Thursday") ? results[i].BusinessHours["Thursday"] : string.Empty;
                                 columnIndex++;
-                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Friday") != null)
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Friday") != null)
                             {
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Friday") ? results[i].BusinessHours["Friday"] : string.Empty;
                                 columnIndex++;
-                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Saturday") != null)
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Saturday") != null)
                             {
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Saturday") ? results[i].BusinessHours["Saturday"] : string.Empty;
                                 columnIndex++;
-                            } if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Sunday") != null)
+                            }
+                            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Sunday") != null)
                             {
                                 worksheet.Cell(i + 2, columnIndex).Value = results[i].BusinessHours.ContainsKey("Sunday") ? results[i].BusinessHours["Sunday"] : string.Empty;
                                 columnIndex++;
@@ -1439,7 +1597,7 @@ namespace WindowsFormsApp2
                         }
                     }
                 }
-               
+
             }
             catch (Exception ex)
             {
@@ -1562,7 +1720,7 @@ namespace WindowsFormsApp2
                 dataColumns.Add(result.SocialMedias.ContainsKey("facebook") ? result.SocialMedias["facebook"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Linkedin") != null)
-            {           
+            {
                 dataColumns.Add(result.SocialMedias.ContainsKey("linkedin") ? result.SocialMedias["linkedin"] : string.Empty);
             }
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Twitter") != null)
@@ -1600,22 +1758,28 @@ namespace WindowsFormsApp2
             if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Monday") != null)
             {
                 dataColumns.Add(result.BusinessHours.ContainsKey("Monday") ? result.BusinessHours["Monday"] : string.Empty);
-            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Tuesday") != null)
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Tuesday") != null)
             {
                 dataColumns.Add(result.BusinessHours.ContainsKey("Tuesday") ? result.BusinessHours["Tuesday"] : string.Empty);
-            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Wednesday") != null)
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Wednesday") != null)
             {
                 dataColumns.Add(result.BusinessHours.ContainsKey("Wednesday") ? result.BusinessHours["Wednesday"] : string.Empty);
-            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Thursday") != null)
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Thursday") != null)
             {
                 dataColumns.Add(result.BusinessHours.ContainsKey("Thursday") ? result.BusinessHours["Thursday"] : string.Empty);
-            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Friday") != null)
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Friday") != null)
             {
                 dataColumns.Add(result.BusinessHours.ContainsKey("Friday") ? result.BusinessHours["Friday"] : string.Empty);
-            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Saturday") != null)
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Saturday") != null)
             {
                 dataColumns.Add(result.BusinessHours.ContainsKey("Saturday") ? result.BusinessHours["Saturday"] : string.Empty);
-            }if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Sunday") != null)
+            }
+            if (SharedDataTableModel.SelectedFields.Find(x => x.Name == "Sunday") != null)
             {
                 dataColumns.Add(result.BusinessHours.ContainsKey("Sunday") ? result.BusinessHours["Sunday"] : string.Empty);
             }
