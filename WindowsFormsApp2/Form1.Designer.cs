@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -397,7 +398,8 @@ namespace WindowsFormsApp2
             cancellationTokenSource = new CancellationTokenSource();
             dataGridView.Rows.Clear();
             //UpdateProgress("", true);
-            results = new List<BusinessInfo>();
+            //results = new List<BusinessInfo>();
+            dataCounter = 0; ;
             var confirmationForm = new ConfirmationForm("Do you want to scrape email and other social media links from the business website? (It can slow down the crawler speed.)");
             var result = confirmationForm.ShowDialog();
             animatedLoader.Visible = true;
@@ -454,7 +456,42 @@ namespace WindowsFormsApp2
                     this.dataGridView.Columns[index].Width = Convert.ToInt32(SharedDataTableModel.SelectedFields[index].Width);
                 }
             }
+            LoadDataFromCSV();
         }
+
+        public void LoadDataFromCSV()
+        {
+
+            string filePath = dataFilePath;
+            if (!File.Exists(filePath)) return;
+
+            string[] lines = File.ReadAllLines(filePath);
+            for (int i = 1; i < lines.Length; i++) // Skip header
+            {
+                this.dataGridView.Rows.Add(ParseCSVLine(lines[i]));
+            }
+        }
+
+        public string[] ParseCSVLine(string csvLine)
+        {
+            List<string> result = new List<string>();
+            string pattern = "(?<=^|,)(\"(?:[^\"]|\"\")*\"|[^,]*)";
+
+            foreach (Match match in Regex.Matches(csvLine, pattern))
+            {
+                string value = match.Value;
+
+                // ✅ Remove surrounding double quotes and replace escaped quotes ("" -> ")
+                if (value.StartsWith("\"") && value.EndsWith("\""))
+                {
+                    value = value.Substring(1, value.Length - 2).Replace("\"\"", "\"");
+                }
+
+                result.Add(value);
+            }
+            return result.ToArray();
+        }
+
 
         private void ChangeCrawlerMenuItem_Click(object sender, EventArgs e)
         {

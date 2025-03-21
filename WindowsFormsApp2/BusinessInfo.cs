@@ -8,6 +8,7 @@ namespace WindowsFormsApp2
 {
     public class BusinessInfo
     {
+        public int? serialNumber {  get; set; }
         public string SearchTerm { get; set; }
         public string ResultTitle { get; set; }
         public string ReviewCount { get; set; }

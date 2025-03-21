@@ -36,11 +36,7 @@ namespace WindowsFormsApp2
         private IWebDriver driver;
         private IWebDriver chromeDriverForBusinessData;
         private int driverProcessId;
-        //private string[] userAgents = {
-        //    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.134 Safari/537.36",
-        //    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.5672.127 Safari/537.36",
-        //    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5628.126 Safari/537.36"
-        //};
+        private static readonly string dataFilePath = AppDataHelper.GetAppDataPath();
         private int businessDriverProcessId;
         private List<BusinessInfo> tempRows = new List<BusinessInfo>();
         private int batchSize = 35;
@@ -82,7 +78,8 @@ namespace WindowsFormsApp2
                     "a[href*='youtube.com']",
                     "a[href*='pinterest.com']"
                 };
-        private List<BusinessInfo> results;
+        //private List<BusinessInfo> results;
+        private int dataCounter = 0;
         public Form1()
         {
             // Load font from file (make sure the file path is correct)
@@ -140,7 +137,8 @@ namespace WindowsFormsApp2
 
         private void exportDataButton_Click(object sender, EventArgs e)
         {
-            ExportToExcel(results);
+            //ExportToExcel(results);
+            NewExportToCsv();
         }
 
         private void clearDataButton_Click(object sender, EventArgs e)
@@ -153,6 +151,7 @@ namespace WindowsFormsApp2
 
         private IWebDriver RestartPrimaryWebDriver()
         {
+
             ChromeOptions options = new ChromeOptions();
             //options.AddArgument("--disable-software-rasterizer");
             options.AddArgument("--disable-gpu");  // Disables GPU acceleration
@@ -164,6 +163,14 @@ namespace WindowsFormsApp2
             options.AddArgument("--no-sandbox");  // Helps in some environments
             options.AddArgument("--disable-dev-shm-usage"); // Prevents shared memory issues
             options.AddArgument("--disable-accelerated-2d-canvas"); // Avoids rendering crashes
+            string userProfilePath = $"C:\\Users\\{Environment.UserName}\\AppData\\Local\\Google\\Chrome\\User Data\\Profile_{Guid.NewGuid()}";
+
+            // ✅ Assign a separate profile directory for each user
+            options.AddArgument($"--user-data-dir={userProfilePath}");
+
+            // ✅ Assign a different debugging port for each user (prevent port conflicts)
+            int debuggingPort = new Random().Next(9222, 9999);
+            options.AddArgument($"--remote-debugging-port={debuggingPort}");
             Random rand = new Random();
             //string randomUserAgent = userAgents[rand.Next(userAgents.Length)];
             //options.AddArgument($"--user-agent={randomUserAgent}");
@@ -177,6 +184,56 @@ namespace WindowsFormsApp2
             return driver;
         }
 
+        private bool NavigateToGoogleMaps()
+        {
+            string mapsUrl = "https://www.google.com/maps/?hl=en&force=tt";
+            int maxRetries = 3;
+            int retryCount = 0;
+            bool pageLoaded = false;
+             
+            while (retryCount < maxRetries && !pageLoaded)
+            {
+                try
+                {
+                    LoggerService.Info($"🔄 Attempt {retryCount + 1}: Loading Google Maps...");
+                    //Console.WriteLine($"🔄 Attempt {retryCount + 1}: Loading Google Maps...");
+                    driver.Navigate().GoToUrl(mapsUrl);
+
+                    // ✅ Ensure the search bar exists before continuing
+                    WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+                    wait.Until(ExpectedConditions.ElementExists(By.CssSelector("label[for='searchboxinput']")));
+                    LoggerService.Info("✅ Google Maps loaded successfully!");
+                    //Console.WriteLine("✅ Google Maps loaded successfully!");
+                    pageLoaded = true; // ✅ Mark as loaded
+                }
+                catch (WebDriverTimeoutException)
+                {
+                    driver.Quit();
+                    driver.Dispose();
+                    driver = null;
+                    KillChromeDriverProcess(driverProcessId);
+                    driver = RestartPrimaryWebDriver();
+                    retryCount++;
+                    LoggerService.Info($"⚠ Google Maps took too long to load. Retrying ({retryCount}/{maxRetries})...");
+
+                    if (retryCount == maxRetries)
+                    {
+                        LoggerService.Info("❌ Failed after multiple attempts. Exiting...");
+                        throw; // Exit if it fails all retries
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LoggerService.Info($"❌ Navigation error: {ex.Message}");
+
+                    break; // Stop retrying if another error occurs
+                }
+            }
+
+            return pageLoaded;
+        }
+
+
         private async Task StartCrawlingAsync(CancellationToken cancellationToken, bool fetchBusinessData)
         {
             try
@@ -186,21 +243,22 @@ namespace WindowsFormsApp2
                 driver = RestartPrimaryWebDriver();
                 //driverActions = new Actions(driver);
                 chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
+                //PowerHelper.PreventSleep();
                 int count = 0;
                 for (int termIndex = 0; termIndex < searchTerms.Length; termIndex++)
                 {
                     string term = searchTerms[termIndex];
                     UpdateCurrentSearchTerms($"Line Number: {termIndex+1}, Term: {term}");
-                    //driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
-                    driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en");
+                    var t = NavigateToGoogleMaps();
                     LoggerService.Info(term);
+                    if (!t) continue;
                     count++;
                     if (cancellationToken.IsCancellationRequested)
                     {
                         //lblStatus.Text = "Crawling stopped.";
                         break;
                     }
-                    if (count > 11)
+                    if (count > 15)
                     {
                         count = 0;
                         driver.Quit();
@@ -217,8 +275,8 @@ namespace WindowsFormsApp2
                         //driverActions = new Actions(driver);
                         chromeDriverForBusinessData = GetChromeDriverForBusinessDataFetch();
                         LoggerService.Info("New driver creating for business data, 189");
-                        driver.Navigate().GoToUrl("https://www.google.com/maps/?hl=en&force=tt");
-                        continue;
+                        var e = NavigateToGoogleMaps();
+                        if (!e) continue;
                     }
                     try
                     {
@@ -395,7 +453,14 @@ namespace WindowsFormsApp2
             {
                 IWebElement mapContainer = null;
                 // Example: Wait for the search results container to be visible
-                wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"))); // Adjust selector based on target element
+                try
+                {
+                    wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"))); // Adjust selector based on target element
+                } catch(Exception exc)
+                {
+                    LoggerService.Error("container not opened"); 
+                    return;
+                }
                 var mapContainers = driver.FindElements(By.XPath("//div[@class='m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd']"));
                 if (mapContainers.Count > 0)
                 {
@@ -414,7 +479,8 @@ namespace WindowsFormsApp2
                         return;
                     }
                 }
-                var processedResults = new HashSet<string>();
+                var processedResultsText = new HashSet<string>();
+                var processedResultsAddress = new HashSet<string>();
                 bool hasMoreResults = true;
                 IJavaScriptExecutor jsExecutor = (IJavaScriptExecutor)driver;
                 int lastHeight = 0;
@@ -457,7 +523,8 @@ namespace WindowsFormsApp2
                             string rating = string.Empty;
                             var titleElements = resultElement.FindElements(By.CssSelector(".qBF1Pd.fontHeadlineSmall"));
                             string title = titleElements.Count > 0 ? titleElements[0].Text : string.Empty;
-                            if (processedResults.Contains(title))
+                            string d = resultElement.Text;
+                            if (processedResultsText.Contains(d))
                             {
                                 continue; // Skip already processed results
                             }
@@ -466,7 +533,7 @@ namespace WindowsFormsApp2
                             //var linkElement = resultElement.FindElements(By.ClassName("lcr4fd"));
                             string hrefValue = string.Empty;
 
-                            processedResults.Add(title);
+                            processedResultsText.Add(d);
                             string safeTitle = title.Replace("'", "', \"'\", '"); // Replaces ' with XPath-compatible concat format
                             IWebElement clickableElement = null;
                             try
@@ -606,7 +673,7 @@ namespace WindowsFormsApp2
                             {
                                 businessHours = ConvertBusinessHours(hourInfo);
                             }
-                            UpdateProgress($"Record no: {(results.Count + 1).ToString()}");
+                            UpdateProgress($"Record no: {(dataCounter + 1).ToString()}");
                             UpdateProgress($"Title: {title}");
                             UpdateProgress($"------------------------");
                             //var existedData = uniqueDataPair.ContainsKey($"{title}_{contactNumber}");
@@ -673,6 +740,7 @@ namespace WindowsFormsApp2
                                 rating = reviewListText[0];
                                 reviewCount = reviewListText[1];
                             }
+                            
                             string city = string.Empty;
                             string zip = string.Empty;
                             string country = string.Empty;
@@ -761,7 +829,8 @@ namespace WindowsFormsApp2
                                 country, keyValuePairs, hrefValue, claim, hourInfo,
                                 businessHours, locateInText, attributes, mapLink
                             );
-                            results.Add(dataTobeAdded);
+                            //results.Add(dataTobeAdded);
+                            dataCounter++;
                             //uniqueDataPair.Add($"{title}_{contactNumber}", dataTobeAdded);
                             InsertRowIntoDatatable(dataTobeAdded);
                             var closeButtons = detailsElems.FindElements(By.XPath("//button[contains(@aria-label, 'Close') and contains(@class, 'VfPpkd-icon-LgbsSe')]"));
@@ -771,7 +840,10 @@ namespace WindowsFormsApp2
                             {
                                 closeButton.Click();
                             }
-
+                            if (title == "register psychology email address domains")
+                            {
+                                var r = "";
+                            }
                             //UpdateProgress("data extract finished"+" -360");
                             //driver.Navigate().Back();
                             //driver.Navigate().Back();
@@ -785,19 +857,20 @@ namespace WindowsFormsApp2
                             // Skip if any element is missing
                         }
                     }
+                    ///if(dataTobeAdded)
                     //IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-                    WebDriverWait scrollWait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                    WebDriverWait scrollWait = new WebDriverWait(driver, TimeSpan.FromSeconds(20));
                     if (!IsEndOfScroll(driver))
                     {
                         scrollWait.Until(driver2 =>
                         {
-                            hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer, processedResults, jsExecutor);
+                            hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer, processedResultsText, jsExecutor);
                             return hasMoreResults;
                         });
                     }
                     else
                     {
-                        hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer, processedResults, jsExecutor);
+                        hasMoreResults = ScrollToLoadMoreResults(driver, mapContainer, processedResultsText, jsExecutor);
                     }
 
                     //if (!fetchBusinessData || !hasUrl)
@@ -824,8 +897,78 @@ namespace WindowsFormsApp2
             }
         }
 
+        bool AreElementsSameByXPath(IWebElement elem1, IWebElement elem2)
+        {
+            return GetElementXPath(elem1) == GetElementXPath(elem2);
+        }
+
+        // 🔹 Helper function to get XPath dynamically
+        string GetElementXPath(IWebElement element)
+        {
+            IJavaScriptExecutor js = (IJavaScriptExecutor)((IWrapsDriver)element).WrappedDriver;
+            return (string)js.ExecuteScript(
+                "function getXPath(el) {" +
+                "var path = '';" +
+                "for (; el && el.nodeType == 1; el = el.parentNode) {" +
+                "idx = Array.prototype.indexOf.call(el.parentNode.children, el) + 1;" +
+                "path = '/' + el.tagName.toLowerCase() + '[' + idx + ']' + path;" +
+                "}" +
+                "return path;" +
+                "} return getXPath(arguments[0]);", element);
+        }
+
+
+        private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer, HashSet<string> processedResults, IJavaScriptExecutor jsExecutor)
+        {
+            bool hasMoreResults = true;
+            try
+            {
+                //int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
+                var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
+                List<string> t = newElements.Select(x =>
+                {
+                    string txt = x.Text;
+                    if (!processedResults.Contains(txt))
+                    {
+                        return "available";
+                    }
+                    else
+                    {
+                        return string.Empty;
+                    }
+
+                }).ToList();
+                t = t.Where(x => x.Length > 0).ToList();
+                hasMoreResults = t.Count != 0;
+
+            }
+            catch (Exception exc)
+            {
+                hasMoreResults = false;
+                LoggerService.Error("Error on has more results", exc);
+            }
+            //ValidateDriverSession(driver, jsExecutor);
+
+
+            return hasMoreResults;
+        }
+
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (driver != null)
+            {
+                driver.Quit();
+                driver.Dispose();
+                driver = null;
+            }
+            KillChromeDriverProcess(driverProcessId);
+            if (chromeDriverForBusinessData != null)
+            {
+                chromeDriverForBusinessData.Quit();
+                chromeDriverForBusinessData.Dispose();
+                chromeDriverForBusinessData = null;
+            }
+            KillChromeDriverProcess(businessDriverProcessId);
             LoggerService.Info("Sky Crawler Application Closed.");
             LoggerService.Close();
             if (driver != null)
@@ -863,6 +1006,7 @@ namespace WindowsFormsApp2
         }
         private void InsertRowIntoDatatable(BusinessInfo dataTobeAdded, bool skipTempRow = false)
         {
+            DataPersistence.SaveDataToCSV(dataTobeAdded);
             if (!skipTempRow) tempRows.Add(dataTobeAdded);
             if (skipTempRow)
             {
@@ -1011,7 +1155,14 @@ namespace WindowsFormsApp2
             {
                 options.AddArgument(item);
             }
+            string userProfilePath = $"C:\\Users\\{Environment.UserName}\\AppData\\Local\\Google\\Chrome\\User Data\\Profile_{Guid.NewGuid()}";
 
+            // ✅ Assign a separate profile directory for each user
+            options.AddArgument($"--user-data-dir={userProfilePath}");
+
+            // ✅ Assign a different debugging port for each user (prevent port conflicts)
+            int debuggingPort = new Random().Next(9222, 9999);
+            options.AddArgument($"--remote-debugging-port={debuggingPort}");
             options.AddUserProfilePreference("profile.managed_default_content_settings.images", 2); // Block images
             options.AddUserProfilePreference("profile.managed_default_content_settings.css", 2);    // Block CSS
             options.AddUserProfilePreference("profile.managed_default_content_settings.fonts", 2);  // Block fonts
@@ -1132,7 +1283,7 @@ namespace WindowsFormsApp2
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching social media links for {businessUrl}: {ex.Message}");
-                LoggerService.Error("Error fetching social media links for {businessUrl}", ex);
+                LoggerService.Error("Error fetching social media links for {businessUrl}");
                 //UpdateProgress($"Error fetching social media links for {businessUrl}: {ex.Message}" + "-583");
             }
             finally
@@ -1251,49 +1402,7 @@ namespace WindowsFormsApp2
 
 
 
-        private bool ScrollToLoadMoreResults(IWebDriver driver, IWebElement mapContainer, HashSet<string> processedResults, IJavaScriptExecutor jsExecutor)
-        {
-            bool hasMoreResults = true;
-            try
-            {
-                //int newHeight = Convert.ToInt32(jsExecutor.ExecuteScript("return arguments[0].scrollHeight", mapContainer));
-                var newElements = driver.FindElements(By.XPath("//div[@class='bfdHYd Ppzolf OFBs3e  ']"));
-                List<string> t = newElements.Select(x =>
-                {
-                    string txt = string.Empty;
-                    try
-                    {
-                        var txtItems = x.FindElements(By.CssSelector(".qBF1Pd.fontHeadlineSmall"));
-                        txt = txtItems.Count > 0 ? txtItems[0].Text : string.Empty;
-                    }
-                    catch (Exception ex)
-                    {
-                        LoggerService.Error("scrool to load more", ex);
-                    }
-                    if (!processedResults.Contains(txt))
-                    {
-                        return txt;
-                    }
-                    else
-                    {
-                        return string.Empty;
-                    }
-
-                }).ToList();
-                t = t.Where(x => x.Length > 0).ToList();
-                hasMoreResults = t.Count != 0;
-
-            }
-            catch (Exception exc)
-            {
-                hasMoreResults = false;
-                LoggerService.Error("Error on has more results", exc);
-            }
-            //ValidateDriverSession(driver, jsExecutor);
-
-
-            return hasMoreResults;
-        }
+        
 
         private Dictionary<string, int> columnIndexCache;
         public void InitializeColumnIndexCache(DataGridView dataGridView)
@@ -1315,6 +1424,38 @@ namespace WindowsFormsApp2
             return -1; // Not found
         }
 
+        private void NewExportToCsv()
+        {
+            try
+            {
+                string sourceFilePath = AppDataHelper.GetAppDataPath(); // ✅ Get saved CSV path
+
+                if (!File.Exists(sourceFilePath))
+                {
+                    MessageBox.Show("No data available to export!", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+                {
+                    saveFileDialog.Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*";
+                    saveFileDialog.Title = "Save CSV File";
+                    saveFileDialog.FileName = "Exported_Data.csv"; // Default filename
+
+                    if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        string destinationFilePath = saveFileDialog.FileName;
+                        File.Copy(sourceFilePath, destinationFilePath, true); // ✅ Copy file to new location
+                        MessageBox.Show("CSV file exported successfully!", "Export Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LoggerService.Error($"Error exporting to Excel: {ex.Message}", ex);
+                MessageBox.Show($"Error exporting CSV: {ex.Message}", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
 
         private void ExportToExcel(List<BusinessInfo> results)
         {
@@ -1375,7 +1516,7 @@ namespace WindowsFormsApp2
                             }
                             for (int i = 0; i < dataGridView.Columns.Count; i++)
                             {
-                                csvContent.Append(row.Cells[i].Value?.ToString().Replace(",", " ")); // Remove extra commas
+                                csvContent.Append(DataPersistence.EscapeCSVValue(row.Cells[i].Value?.ToString())); // Remove extra commas
                                 csvContent.Append(",");
                             }
                             csvContent.Append(formattedDate);

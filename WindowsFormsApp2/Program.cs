@@ -16,7 +16,18 @@ namespace WindowsFormsApp2
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            try
+            {
+                Application.Run(new Form1());
+            }
+            catch(Exception exc)
+            {
+                LoggerService.Error("root excaption", exc);
+            }
+            finally
+            {
+                //PowerHelper.RestoreSleep(); // ✅ Restore sleep even if app crashes
+            }
         }
     }
 }
